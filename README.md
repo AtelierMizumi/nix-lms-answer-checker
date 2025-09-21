@@ -196,6 +196,8 @@ The script provides detailed console logging:
 
 ## 📄 License
 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 This project is provided for educational purposes. Please ensure compliance with your institution's academic integrity policies.
 
 ## 🤝 Contributing
@@ -403,6 +405,8 @@ Script cung cấp ghi log console chi tiết:
 - **Dựa trên phiên**: Không lưu trữ hoặc theo dõi liên tục
 
 ## 📄 Giấy phép
+
+Dự án này được cấp phép theo Giấy phép MIT - xem file [LICENSE](LICENSE) để biết chi tiết.
 
 Dự án này được cung cấp cho mục đích giáo dục. Vui lòng đảm bảo tuân thủ các chính sách toàn vẹn học thuật của tổ chức bạn.
 
