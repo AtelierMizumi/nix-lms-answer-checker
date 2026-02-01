@@ -39,8 +39,10 @@
         AUTO_FILL_DELAY: 500, // ms
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions',
-            TYPE_3_DROP_ZONE: '.ui-droppable, .static',
-            TYPE_3_DRAGGABLE: '.draggable'
+            // Type 3 - actual DOM selectors from Nix LMS
+            TYPE_3_DROP_ZONE: '.droppable-zone-question',
+            TYPE_3_DRAGGABLE: '.answer-text.ui-draggable',
+            TYPE_3_ANSWER_POOL: '.droppable-zone-answer'
         }
     };
 
@@ -335,42 +337,115 @@
         async handleType3(container, questionData) {
             Utils.log('🎯 Type 3 - Drag & Drop with Index');
 
+            // Find drop zones (where answers go) and draggables (source items)
+            const dropZones = container.querySelectorAll(CONFIG.SELECTORS.TYPE_3_DROP_ZONE);
             const draggables = container.querySelectorAll(CONFIG.SELECTORS.TYPE_3_DRAGGABLE);
 
-            if (draggables.length === 0) {
-                Utils.log('⚠️ No draggable elements found');
+            Utils.log(`📋 Found ${dropZones.length} drop zones, ${draggables.length} draggables`);
+
+            if (dropZones.length === 0) {
+                Utils.log('⚠️ No drop zones found');
                 return;
             }
 
+            // Build a map of available draggable items
+            const draggableMap = new Map();
+            draggables.forEach(drag => {
+                const content = drag.getAttribute('data-content') || drag.textContent.trim();
+                const isReusable = drag.getAttribute('data-reusable') === '1';
+                if (!draggableMap.has(content) || isReusable) {
+                    draggableMap.set(content, { element: drag, reusable: isReusable, used: false });
+                }
+            });
+
             for (const answer of questionData.answers) {
-                let foundDraggable = null;
-
-                for (const drag of draggables) {
-                    const dragText = drag.textContent.trim();
-                    if (dragText === answer.content) {
-                        foundDraggable = drag;
-                        break;
-                    }
-                }
-
-                if (!foundDraggable) {
-                    Utils.log(`⚠️ Draggable not found for: "${answer.content}"`);
-                    continue;
-                }
-
-                const dropZones = container.querySelectorAll(CONFIG.SELECTORS.TYPE_3_DROP_ZONE);
-                const targetZone = dropZones[answer.targetIndex - 1];
+                const targetIndex = answer.targetIndex - 1; // Convert to 0-indexed
+                const targetZone = dropZones[targetIndex];
 
                 if (!targetZone) {
                     Utils.log(`⚠️ Drop zone not found for index: ${answer.targetIndex}`);
                     continue;
                 }
 
-                await this.simulateDragDrop(foundDraggable, targetZone);
-                Utils.log(`✅ Dragged "${answer.content}" to position ${answer.targetIndex}`);
+                // Find the matching draggable
+                const draggableInfo = draggableMap.get(answer.content);
+                if (!draggableInfo) {
+                    Utils.log(`⚠️ Draggable not found for: "${answer.content}"`);
+                    continue;
+                }
 
-                await new Promise(r => setTimeout(r, 200));
+                // Method 1: Try jQuery UI simulation if available
+                if (typeof $ !== 'undefined' && $(draggableInfo.element).data('ui-draggable')) {
+                    await this.simulateJQueryDragDrop(draggableInfo.element, targetZone, answer.content);
+                } else {
+                    // Method 2: Direct DOM manipulation fallback
+                    await this.directDragDropFill(draggableInfo.element, targetZone, answer.content);
+                }
+
+                Utils.log(`✅ [${answer.targetIndex}] Filled: "${answer.content}"`);
+
+                // Mark non-reusable items as used
+                if (!draggableInfo.reusable) {
+                    draggableInfo.used = true;
+                }
+
+                await new Promise(r => setTimeout(r, 150));
             }
+        },
+
+        async simulateJQueryDragDrop(draggable, dropZone, content) {
+            try {
+                const $draggable = $(draggable);
+                const $dropZone = $(dropZone);
+
+                // Clone for reusable or move for non-reusable
+                const isReusable = draggable.getAttribute('data-reusable') === '1';
+                const $element = isReusable ? $draggable.clone() : $draggable;
+
+                // Trigger jQuery UI events
+                $dropZone.trigger($.Event('drop', {
+                    target: dropZone,
+                    originalEvent: { dataTransfer: { getData: () => content } }
+                }));
+
+                // Set content in drop zone
+                $element.appendTo($dropZone);
+                $dropZone.addClass('filled');
+
+                // Trigger change event
+                $dropZone.trigger('change');
+            } catch (e) {
+                Utils.log(`jQuery simulation failed, falling back: ${e.message}`);
+                await this.directDragDropFill(draggable, dropZone, content);
+            }
+        },
+
+        async directDragDropFill(draggable, dropZone, content) {
+            // Direct DOM manipulation for jQuery UI drop zones
+            const isReusable = draggable.getAttribute('data-reusable') === '1';
+
+            // Clone the draggable element
+            const clone = draggable.cloneNode(true);
+            clone.classList.remove('ui-draggable-handle');
+            clone.style.position = 'relative';
+            clone.style.left = '0';
+            clone.style.top = '0';
+
+            // Clear and fill the drop zone
+            dropZone.innerHTML = '';
+            dropZone.appendChild(clone);
+            dropZone.classList.add('filled');
+            dropZone.classList.remove('quiz-answer-wrong');
+
+            // Hide original if not reusable
+            if (!isReusable) {
+                draggable.style.visibility = 'hidden';
+                draggable.style.position = 'absolute';
+            }
+
+            // Dispatch events to notify the page
+            dropZone.dispatchEvent(new Event('change', { bubbles: true }));
+            dropZone.dispatchEvent(new Event('drop', { bubbles: true, detail: { content } }));
         },
 
         async handleType4(container, questionData) {
