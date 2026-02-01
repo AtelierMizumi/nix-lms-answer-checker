@@ -1,0 +1,41 @@
+{
+    "questions": [
+        {
+            "question": {
+                "id": 1003,
+                "title": "Ghép nối thuật ngữ với định nghĩa",
+                "content": "<p>Nối các thuật ngữ bên trái với định nghĩa phù hợp bên phải:</p>",
+                "type": 5,
+                "answers": [
+                    {
+                        "id": 4001,
+                        "content": "HTML"
+                    },
+                    {
+                        "id": 4002,
+                        "content": "CSS"
+                    },
+                    {
+                        "id": 4003,
+                        "content": "JavaScript"
+                    }
+                ],
+                "matching_answers": [
+                    {
+                        "answer_id": 4001,
+                        "answer_matching": "Ngôn ngữ đánh dấu siêu văn bản"
+                    },
+                    {
+                        "answer_id": 4002,
+                        "answer_matching": "Ngôn ngữ định dạng giao diện"
+                    },
+                    {
+                        "answer_id": 4003,
+                        "answer_matching": "Ngôn ngữ lập trình phía client"
+                    }
+                ]
+            },
+            "answer_display": null
+        }
+    ]
+}

@@ -1,0 +1,57 @@
+{
+    "questions": [
+        {
+            "question": {
+                "id": 1002,
+                "title": "Kéo các thành phần vào đúng vị trí trên hình",
+                "content": "<p>Đặt các nhãn vào đúng vị trí trên sơ đồ:</p>",
+                "type": 4,
+                "answers": [
+                    {
+                        "id": 3001,
+                        "content": "CPU",
+                        "draggable_answer": {
+                            "correct_index": null,
+                            "reusable": 0,
+                            "coordinates": [
+                                {
+                                    "x": 150,
+                                    "y": 80
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "id": 3002,
+                        "content": "RAM",
+                        "draggable_answer": {
+                            "correct_index": null,
+                            "reusable": 0,
+                            "coordinates": [
+                                {
+                                    "x": 280,
+                                    "y": 120
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "id": 3003,
+                        "content": "Hard Drive",
+                        "draggable_answer": {
+                            "correct_index": null,
+                            "reusable": 0,
+                            "coordinates": [
+                                {
+                                    "x": 200,
+                                    "y": 200
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "answer_display": "[3001, 3002, 3003]"
+        }
+    ]
+}

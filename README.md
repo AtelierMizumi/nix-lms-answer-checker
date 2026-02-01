@@ -49,17 +49,23 @@ Copy and paste the entire content into your browser console (F12) to get started
 
 ## 📋 Installation & Usage
 
-### Quick Start
+### Option 1: Tampermonkey (Recommended) 🔥
+
+Auto-loads every time you visit NIX LMS - no need to paste code manually!
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/) extension for your browser
+2. Click on Tampermonkey icon → "Create a new script"
+3. Delete all default content
+4. Copy content from [`src/nix-helper.user.js`](https://github.com/AtelierMizumi/nix-lms-answer-checker/blob/main/src/nix-helper.user.js)
+5. Paste and save (Ctrl+S)
+6. Visit NIX LMS - script will load automatically!
+
+### Option 2: Console Paste (Quick Start)
+
 1. Open your browser's Developer Console (F12)
 2. Copy and paste the entire contents of `paste-to-console.js`
 3. Press Enter to execute
 4. Start taking your quiz - answers will be automatically extracted!
-
-### Manual Extraction
-If automatic detection fails:
-1. Click the "🎌 Extract Answers" button (top-left corner)
-2. Paste the JSON response from the Network tab
-3. Answers will be displayed in the popup
 
 ## 🎯 Supported Question Types
 

@@ -1,0 +1,36 @@
+{
+  "name": "nix-lms-answer-checker",
+  "version": "2.0.0",
+  "description": "Automatically extracts and displays answers from NIX Digital LMS quizzes",
+  "main": "paste-to-console.js",
+  "scripts": {
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "echo 'Build script - TODO: Add bundler'",
+    "test": "echo 'Test script - TODO: Add test runner'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AtelierMizumi/nix-lms-answer-checker.git"
+  },
+  "keywords": [
+    "lms",
+    "nix",
+    "quiz",
+    "helper",
+    "tampermonkey",
+    "userscript"
+  ],
+  "author": "AtelierMizumi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AtelierMizumi/nix-lms-answer-checker/issues"
+  },
+  "homepage": "https://github.com/AtelierMizumi/nix-lms-answer-checker#readme",
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
