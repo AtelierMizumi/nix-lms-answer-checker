@@ -561,68 +561,73 @@
         async handleType7(container, questionData) {
             Utils.log('🎯 Type 7 - Fill in the Blank / Dropdown Choice');
 
-            // Get all select dropdowns in order - each corresponds to a blank [[1]], [[2]], etc.
-            const selects = container.querySelectorAll('select');
-            Utils.log(`📋 Found ${selects.length} dropdown(s) in container`);
-
             for (const answer of questionData.answers) {
                 // Handle dropdown-choice (select dropdown by order)
                 if (answer.type === 'dropdown-choice') {
                     const dropdownIndex = answer.order - 1; // order is 1-indexed
-                    Utils.log(`🔍 [Blank ${answer.order}] Looking for: "${answer.content.trim()}"`);
+                    const answerText = answer.content.trim();
+                    Utils.log(`🔍 [Blank ${answer.order}] Looking for: "${answerText}"`);
 
                     let found = false;
 
-                    // First try: Target specific dropdown by order
+                    // Method 1: Standard <select> dropdowns
+                    const selects = container.querySelectorAll('select');
                     if (selects[dropdownIndex]) {
                         const select = selects[dropdownIndex];
-                        const options = select.querySelectorAll('option');
-
-                        for (const option of options) {
+                        for (const option of select.querySelectorAll('option')) {
                             const optionText = option.textContent.trim();
-                            const answerText = answer.content.trim();
-
-                            if (
-                                optionText === answerText ||
-                                optionText.includes(answerText) ||
-                                answerText.includes(optionText)
-                            ) {
+                            if (optionText === answerText || optionText.includes(answerText) || answerText.includes(optionText)) {
                                 select.value = option.value;
                                 select.dispatchEvent(new Event('change', { bubbles: true }));
-                                Utils.log(`✅ [Blank ${answer.order}] Selected: "${optionText}"`);
+                                Utils.log(`✅ [Blank ${answer.order}] Selected dropdown: "${optionText}"`);
                                 found = true;
                                 break;
                             }
                         }
                     }
 
-                    // Fallback: Try radio buttons grouped by blank
+                    // Method 2: Radio buttons - find by text content match
                     if (!found) {
-                        // Look for radio groups - they might be organized by name attribute
                         const allRadios = container.querySelectorAll('input[type="radio"]');
-                        const radioGroups = {};
-
-                        allRadios.forEach(radio => {
-                            const name = radio.name || 'default';
-                            if (!radioGroups[name]) radioGroups[name] = [];
-                            radioGroups[name].push(radio);
-                        });
-
-                        const groupNames = Object.keys(radioGroups);
-                        const targetGroup = radioGroups[groupNames[dropdownIndex]] || [];
-
-                        for (const radio of targetGroup) {
+                        for (const radio of allRadios) {
+                            // Check multiple possible text containers
                             const label = radio.closest('label') || radio.parentElement;
-                            const row = radio.closest('.d-flex, .row, .form-group, .answer-option, li');
-                            const textContainer = row || label;
+                            const row = radio.closest('.d-flex, .row, .form-group, .answer-option, li, .form-check');
+                            const textContent = (row?.textContent || label?.textContent || '').trim();
 
-                            if (textContainer && textContainer.textContent.includes(answer.content.trim())) {
+                            if (textContent.includes(answerText) || answerText.includes(textContent)) {
                                 radio.checked = true;
                                 radio.click();
                                 radio.dispatchEvent(new Event('change', { bubbles: true }));
-                                Utils.log(
-                                    `✅ [Blank ${answer.order}] Selected radio: "${answer.content.substring(0, 30)}..."`
-                                );
+                                Utils.log(`✅ [Blank ${answer.order}] Selected radio: "${answerText}"`);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Method 3: Custom dropdown buttons (Bootstrap/custom UI)
+                    if (!found) {
+                        const dropdownItems = container.querySelectorAll('.dropdown-item, .dropdown-menu a, .dropdown-menu button, [data-value]');
+                        for (const item of dropdownItems) {
+                            const itemText = item.textContent.trim();
+                            if (itemText === answerText || itemText.includes(answerText)) {
+                                item.click();
+                                Utils.log(`✅ [Blank ${answer.order}] Clicked dropdown item: "${itemText}"`);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Method 4: Button groups or clickable options
+                    if (!found) {
+                        const buttons = container.querySelectorAll('button, .btn, [role="option"], .option, .choice');
+                        for (const btn of buttons) {
+                            const btnText = btn.textContent.trim();
+                            if (btnText === answerText || btnText.includes(answerText)) {
+                                btn.click();
+                                Utils.log(`✅ [Blank ${answer.order}] Clicked button: "${btnText}"`);
                                 found = true;
                                 break;
                             }
@@ -630,9 +635,7 @@
                     }
 
                     if (!found) {
-                        Utils.log(
-                            `⚠️ [Blank ${answer.order}] Could not find element for: "${answer.content.substring(0, 30)}..."`
-                        );
+                        Utils.log(`⚠️ [Blank ${answer.order}] Could not find element for: "${answerText}"`);
                     }
                 }
                 // Handle regular text input
