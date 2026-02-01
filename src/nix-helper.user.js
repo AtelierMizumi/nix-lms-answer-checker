@@ -171,21 +171,53 @@
             // STRATEGY: TYPE 3 (Drag & Drop Text / Reordering)
             if (q.type === 3) {
                 if (q.answers && Array.isArray(q.answers)) {
+                    // Step 1: Build a map of correct_index -> answer content
+                    const answerByIndex = new Map();
                     q.answers.forEach(ans => {
-                        if (
-                            ans.draggable_answer &&
-                            ans.draggable_answer.correct_index !== null &&
-                            ans.draggable_answer.correct_index !== undefined
-                        ) {
-                            result.answers.push({
+                        if (ans.draggable_answer && ans.draggable_answer.correct_index != null) {
+                            answerByIndex.set(ans.draggable_answer.correct_index, {
                                 content: this.cleanHtml(ans.content),
-                                targetIndex: ans.draggable_answer.correct_index,
-                                reusable: ans.draggable_answer.reusable === 1,
-                                type: 'drag-order'
+                                reusable: ans.draggable_answer.reusable === 1
                             });
                         }
                     });
-                    result.answers.sort((a, b) => a.targetIndex - b.targetIndex);
+
+                    // Step 2: Parse [[n]] pattern from question content to get physical positions
+                    const content = q.content || '';
+                    const placeholderRegex = /\[\[(\d+)\]\]/g;
+                    let match;
+                    let physicalPosition = 1;
+
+                    while ((match = placeholderRegex.exec(content)) !== null) {
+                        const placeholderNum = parseInt(match[1], 10);
+                        const answerInfo = answerByIndex.get(placeholderNum);
+
+                        if (answerInfo) {
+                            result.answers.push({
+                                content: answerInfo.content,
+                                targetIndex: physicalPosition, // Physical slot position
+                                placeholderNum: placeholderNum, // Original [[n]] number
+                                reusable: answerInfo.reusable,
+                                type: 'drag-order'
+                            });
+                        }
+                        physicalPosition++;
+                    }
+
+                    // Fallback: if no [[n]] pattern found, use old method
+                    if (result.answers.length === 0) {
+                        q.answers.forEach(ans => {
+                            if (ans.draggable_answer && ans.draggable_answer.correct_index != null) {
+                                result.answers.push({
+                                    content: this.cleanHtml(ans.content),
+                                    targetIndex: ans.draggable_answer.correct_index,
+                                    reusable: ans.draggable_answer.reusable === 1,
+                                    type: 'drag-order'
+                                });
+                            }
+                        });
+                        result.answers.sort((a, b) => a.targetIndex - b.targetIndex);
+                    }
                 }
             }
             // STRATEGY: TYPE 4 (Drag & Drop with coordinates)
