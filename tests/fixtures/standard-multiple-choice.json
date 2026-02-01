@@ -1,0 +1,66 @@
+{
+    "questions": [
+        {
+            "question": {
+                "id": 1005,
+                "title": "Phần mềm nào dùng để duyệt web?",
+                "content": "<p>Chọn đáp án đúng:</p>",
+                "type": 1,
+                "answers": [
+                    {
+                        "id": 6001,
+                        "content": "Microsoft Word",
+                        "correct": 0
+                    },
+                    {
+                        "id": 6002,
+                        "content": "Google Chrome",
+                        "correct": 1
+                    },
+                    {
+                        "id": 6003,
+                        "content": "Adobe Photoshop",
+                        "correct": 0
+                    },
+                    {
+                        "id": 6004,
+                        "content": "VLC Media Player",
+                        "correct": 0
+                    }
+                ]
+            },
+            "answer_display": null
+        },
+        {
+            "question": {
+                "id": 1006,
+                "title": "Đâu là ngôn ngữ lập trình?",
+                "content": "<p>Chọn tất cả đáp án đúng:</p>",
+                "type": 2,
+                "answers": [
+                    {
+                        "id": 7001,
+                        "content": "Python",
+                        "correct": 1
+                    },
+                    {
+                        "id": 7002,
+                        "content": "HTML",
+                        "correct": 0
+                    },
+                    {
+                        "id": 7003,
+                        "content": "JavaScript",
+                        "correct": 1
+                    },
+                    {
+                        "id": 7004,
+                        "content": "CSS",
+                        "correct": 0
+                    }
+                ]
+            },
+            "answer_display": null
+        }
+    ]
+}

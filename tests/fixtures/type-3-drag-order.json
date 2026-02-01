@@ -1,0 +1,47 @@
+{
+    "questions": [
+        {
+            "question": {
+                "id": 1001,
+                "title": "Sắp xếp các bước theo thứ tự đúng",
+                "content": "<p>Hãy kéo thả các bước dưới đây vào đúng vị trí:</p>",
+                "type": 3,
+                "answers": [
+                    {
+                        "id": 2001,
+                        "content": "Bước 1: Khởi động máy tính",
+                        "draggable_answer": {
+                            "correct_index": 1,
+                            "reusable": 0
+                        }
+                    },
+                    {
+                        "id": 2002,
+                        "content": "Bước 2: Mở trình duyệt",
+                        "draggable_answer": {
+                            "correct_index": 2,
+                            "reusable": 0
+                        }
+                    },
+                    {
+                        "id": 2003,
+                        "content": "Bước 3: Nhập địa chỉ website",
+                        "draggable_answer": {
+                            "correct_index": 3,
+                            "reusable": 0
+                        }
+                    },
+                    {
+                        "id": 2004,
+                        "content": "Bước 4: Đăng nhập tài khoản",
+                        "draggable_answer": {
+                            "correct_index": 4,
+                            "reusable": 0
+                        }
+                    }
+                ]
+            },
+            "answer_display": null
+        }
+    ]
+}

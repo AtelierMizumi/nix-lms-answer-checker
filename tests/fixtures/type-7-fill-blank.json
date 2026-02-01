@@ -1,0 +1,27 @@
+{
+    "questions": [
+        {
+            "question": {
+                "id": 1004,
+                "title": "Điền vào chỗ trống",
+                "content": "<p>Hoàn thành các câu sau:</p>",
+                "type": 7,
+                "answers": [
+                    {
+                        "id": 5001,
+                        "content": "{\"child_answers\": [{\"content\": \"Hà Nội\"}]}"
+                    },
+                    {
+                        "id": 5002,
+                        "content": "{\"child_answers\": [{\"content\": \"1945\"}]}"
+                    },
+                    {
+                        "id": 5003,
+                        "content": "{\"child_answers\": [{\"content\": \"Việt Nam\"}]}"
+                    }
+                ]
+            },
+            "answer_display": null
+        }
+    ]
+}

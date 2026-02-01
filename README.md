@@ -1,419 +1,315 @@
-# NIX Digital LMS Answer Checker
+<p align="center">
+  <img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/platform-Browser-orange?style=for-the-badge" alt="Platform">
+</p>
 
-**Language / Ngôn ngữ:** [English](#english) | [Tiếng Việt](#tiếng-việt)
+<h1 align="center">🤖 NIX LMS Answer Helper</h1>
+
+<p align="center">
+  <strong>Tự động trích xuất và hiển thị đáp án từ NIX Digital LMS</strong><br>
+  <em>Hỗ trợ auto-fill thông minh cho nhiều loại câu hỏi</em>
+</p>
+
+<p align="center">
+  <a href="#-cài-đặt-nhanh">Cài đặt</a> •
+  <a href="#-tính-năng">Tính năng</a> •
+  <a href="#-hướng-dẫn-sử-dụng">Hướng dẫn</a> •
+  <a href="#-english">English</a>
+</p>
 
 ---
 
-## English
+## 🚀 Cài đặt nhanh
 
-🎌 **Enhanced UI Version with Auto-Complete Functionality**
+### Cách 1: Tampermonkey (Khuyến nghị) ⭐
 
-A powerful browser console script that automatically extracts and displays answers from NIX Digital LMS quizzes, featuring intelligent auto-completion and support for multiple question types.
+> Script tự động chạy mỗi khi bạn truy cập NIX LMS!
 
-## 🚀 Quick Start - One-Liner
+| Bước | Hành động                                                                     |
+| :--: | ----------------------------------------------------------------------------- |
+|  1️⃣  | Cài đặt [Tampermonkey](https://www.tampermonkey.net/) cho trình duyệt của bạn |
+|  2️⃣  | Click icon Tampermonkey → **"Create a new script"**                           |
+|  3️⃣  | Xóa hết nội dung mặc định                                                     |
+|  4️⃣  | Copy nội dung từ [`src/nix-helper.user.js`](src/nix-helper.user.js)           |
+|  5️⃣  | Paste vào Tampermonkey và **Save** (Ctrl+S)                                   |
+|  6️⃣  | Truy cập NIX LMS - Script tự động hoạt động! ✨                               |
 
-Get the ready-to-use script here: **[📋 paste-to-console.js](https://github.com/AtelierMizumi/nix-lms-answer-checker/blob/main/paste-to-console.js)**
+### Cách 2: Console (Nhanh gọn)
 
-Copy and paste the entire content into your browser console (F12) to get started immediately!
-
-## 🚀 Features
-
-### Core Functionality
-- **Automatic Answer Extraction**: Intercepts quiz responses via XMLHttpRequest and Fetch API
-- **Multi-Type Question Support**: Handles various question formats including:
-  - Type 3: Drag & drop with ordering
-  - Type 4: Drag & drop positioning
-  - Type 5: Matching questions
-  - Type 7: Short answer/Fill-in-the-blank
-  - Standard multiple choice, checkboxes, and text inputs
-- **Real-time Answer Display**: Floating popup window with organized answer presentation
-- **Auto-Complete**: Intelligent form filling for all supported question types
-
-### User Interface
-- **Draggable Popup Window**: Moveable interface that doesn't interfere with quiz taking
-- **One-Click Copy**: Individual copy buttons for each answer
-- **Visibility Toggle**: Show/hide popup without losing data
-- **Minimize/Maximize**: Compact view option
-- **Manual Extract Button**: Backup option for manual JSON input
-
-### Auto-Complete Features
-- **Smart Detection**: Automatically identifies question elements on the page
-- **Multi-Format Support**:
-  - Select2 dropdowns
-  - Radio buttons and checkboxes
-  - Text inputs and textareas
-  - Drag & drop elements
-  - Matching question dropdowns
-- **Coordinate-Based Positioning**: Precise placement for drag & drop questions
-- **Event Simulation**: Triggers proper change events for form validation
-
-## 📋 Installation & Usage
-
-### Quick Start
-1. Open your browser's Developer Console (F12)
-2. Copy and paste the entire contents of `paste-to-console.js`
-3. Press Enter to execute
-4. Start taking your quiz - answers will be automatically extracted!
-
-### Manual Extraction
-If automatic detection fails:
-1. Click the "🎌 Extract Answers" button (top-left corner)
-2. Paste the JSON response from the Network tab
-3. Answers will be displayed in the popup
-
-## 🎯 Supported Question Types
-
-### Type 3: Drag & Drop with Ordering
-- Displays items with their correct order and index
-- Auto-fills by positioning elements correctly
-
-### Type 4: Drag & Drop Positioning  
-- Shows content with exact coordinates (x, y)
-- Automatically moves draggable elements to correct positions
-
-### Type 5: Matching Questions
-- Displays question → answer pairs
-- Auto-selects correct matches in dropdown menus
-
-### Type 7: Short Answer/Fill-in-the-blank
-- Shows correct answers with their order and type
-- Fills text inputs automatically
-
-### Standard Questions
-- Multiple choice (radio buttons)
-- Multiple select (checkboxes)
-- Text inputs and textareas
-- Dropdown selections
-
-## 🤖 Auto-Complete Controls
-
-### Toggle Auto-Complete
-- Click the **🤖** button in the popup header
-- Green background = Enabled, Gray background = Disabled
-- Status logged to console
-
-### Manual Auto-Fill
-- Click the **🚀** button to trigger auto-fill immediately
-- Also available as "🤖 Auto-Fill" button in popup footer
-
-### Auto-Fill Behavior
-- Processes questions sequentially with 500ms delay
-- Triggers proper events for form validation
-- Logs progress to console for debugging
-
-## 🔧 Technical Details
-
-### API Interception
-The script monitors these endpoints:
-- `quiz-submission-check-answer` (XMLHttpRequest)
-- `quiz-submission-check-answer` (Fetch API)
-
-### JSON Structure Support
-- **New Structure**: `questions` array with nested question data
-- **Legacy Structure**: Direct `answers` array (backward compatibility)
-
-### Element Detection
-- Uses multiple strategies to find form elements
-- Supports jQuery/Select2 integration
-- Handles various CSS frameworks and custom implementations
-
-## 📚 Available Functions
-
-After loading the script, these global functions are available:
-
-```javascript
-// Extract answers from JSON response
-nixExtract(jsonResponse)
-
-// Toggle popup visibility
-nixToggle()
-
-// Trigger auto-fill manually
-nixAutoFill()
+```
+1. Mở DevTools (F12) → Tab Console
+2. Copy nội dung từ paste-to-console.js
+3. Paste vào Console → Enter
+4. Làm bài quiz - đáp án hiện tự động!
 ```
 
-## 🎨 UI Components
+---
 
-### Header Controls
-- **👁️** - Toggle popup visibility
-- **🤖/🔧** - Toggle auto-complete mode
-- **🚀** - Manual auto-fill trigger
-- **➖/➕** - Minimize/maximize popup
-- **×** - Close popup
+## ✨ Tính năng
 
-### Footer Actions
-- **📋 Copy All** - Copy all answers to clipboard
-- **🤖 Auto-Fill** - Trigger auto-completion
-- **❌ Close** - Close popup window
+<table>
+<tr>
+<td width="50%">
 
-## 🔍 Console Output
+### 📡 Tự động bắt đáp án
 
-The script provides detailed console logging:
-- ✅ Setup confirmation and available features
-- 🎯 Quiz response detection
-- 📚 Organized answer display by question
-- 🤖 Auto-fill progress and results
-- ⚠️ Warnings for missing elements or errors
+- Chặn API response tự động
+- Không cần thao tác thủ công
+- Hỗ trợ XMLHttpRequest & Fetch
 
-## ⚙️ Configuration
+</td>
+<td width="50%">
 
-### Auto-Complete Settings
-- **Default State**: Disabled (manual activation required)
-- **Delay Between Questions**: 500ms
-- **Completion Timeout**: Based on question count + 1 second
+### 🎯 Auto-Fill thông minh
 
-### UI Positioning
-- **Default Position**: Top-right corner (20px from edges)
-- **Draggable**: Full popup can be repositioned
-- **Z-Index**: 10000 (appears above most page elements)
+- Điền form tự động
+- Hỗ trợ drag & drop
+- Mô phỏng sự kiện chính xác
 
-## 🛠️ Troubleshooting
+</td>
+</tr>
+<tr>
+<td>
 
-### Auto-Fill Not Working
-1. Check if auto-complete is enabled (🤖 button should be green)
-2. Verify question elements are loaded on the page
-3. Check console for error messages
-4. Try manual auto-fill with 🚀 button
+### 🎨 Giao diện đẹp
 
-### Answers Not Appearing
-1. Ensure you're on a quiz page with active questions
-2. Check Network tab for `quiz-submission-check-answer` requests
-3. Try manual extraction with the "🎌 Extract Answers" button
+- Popup kéo thả được
+- Thiết kế hiện đại
+- Phân loại theo màu sắc
 
-### Drag & Drop Issues
-1. Verify coordinates are being detected correctly
-2. Check if jQuery UI draggable is available
-3. Ensure drag area container exists on the page
+</td>
+<td>
 
-## 🔒 Security & Privacy
+### 📋 Tiện ích
 
-- **Local Processing**: All operations happen in your browser
-- **No Data Transmission**: Script doesn't send data to external servers
-- **Console Access Only**: Requires manual installation via developer console
-- **Session-Based**: No persistent storage or tracking
+- Copy đáp án 1 click
+- Thu nhỏ/phóng to popup
+- Debug mode cho developer
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-This project is provided for educational purposes. Please ensure compliance with your institution's academic integrity policies.
-
-## 🤝 Contributing
-
-Feel free to submit issues and enhancement requests. When contributing:
-1. Test thoroughly with different question types
-2. Maintain compatibility with existing features
-3. Follow the existing code style and commenting conventions
-4. Update documentation for new features
+</td>
+</tr>
+</table>
 
 ---
 
-**Note**: This tool is designed to assist with learning and should be used responsibly in accordance with your educational institution's policies.
+## 📚 Loại câu hỏi hỗ trợ
+
+| Type | Loại câu hỏi             | Hiển thị | Auto-Fill |
+| :--: | ------------------------ | :------: | :-------: |
+| 🎯 3 | Kéo thả theo thứ tự      |    ✅    |    ✅     |
+| 📐 4 | Kéo thả theo tọa độ      |    ✅    |    ✅     |
+| 🔗 5 | Ghép nối (Matching)      |    ✅    |    ✅     |
+| ✍️ 7 | Điền vào chỗ trống       |    ✅    |    ✅     |
+| 📝 1 | Trắc nghiệm đơn          |    ✅    |    ✅     |
+| ☑️ 2 | Trắc nghiệm nhiều đáp án |    ✅    |    ✅     |
 
 ---
 
-## Tiếng Việt
+## 📖 Hướng dẫn sử dụng
 
-🎌 **Phiên bản giao diện nâng cao với tính năng tự động hoàn thành**
+### Bước 1: Cài đặt script
 
-Một script console mạnh mẽ tự động trích xuất và hiển thị đáp án từ các bài kiểm tra NIX Digital LMS, có tính năng tự động hoàn thành thông minh và hỗ trợ nhiều loại câu hỏi.
+Làm theo hướng dẫn ở phần [Cài đặt nhanh](#-cài-đặt-nhanh)
 
-## 🚀 Bắt đầu nhanh - Code một dòng
+### Bước 2: Truy cập quiz
 
-Lấy script sẵn sàng sử dụng tại đây: **[📋 paste-to-console.js](https://github.com/AtelierMizumi/nix-lms-answer-checker/blob/main/paste-to-console.js)**
+Vào trang quiz trên NIX LMS. Popup sẽ xuất hiện ở góc phải màn hình:
 
-Copy và paste toàn bộ nội dung vào console trình duyệt (F12) để bắt đầu ngay lập tức!
-
-## 🚀 Tính năng
-
-### Chức năng cốt lõi
-- **Trích xuất đáp án tự động**: Chặn phản hồi bài kiểm tra qua XMLHttpRequest và Fetch API
-- **Hỗ trợ nhiều loại câu hỏi**: Xử lý các định dạng câu hỏi khác nhau bao gồm:
-  - Loại 3: Kéo thả với thứ tự
-  - Loại 4: Kéo thả định vị
-  - Loại 5: Câu hỏi ghép đôi
-  - Loại 7: Câu trả lời ngắn/Điền vào chỗ trống
-  - Trắc nghiệm tiêu chuẩn, checkbox và nhập văn bản
-- **Hiển thị đáp án thời gian thực**: Cửa sổ popup nổi với cách trình bày đáp án có tổ chức
-- **Tự động hoàn thành**: Điền form thông minh cho tất cả loại câu hỏi được hỗ trợ
-
-### Giao diện người dùng
-- **Cửa sổ popup có thể kéo**: Giao diện di chuyển được không can thiệp vào việc làm bài
-- **Copy một cú nhấp**: Nút copy riêng biệt cho mỗi đáp án
-- **Chuyển đổi hiển thị**: Ẩn/hiện popup mà không mất dữ liệu
-- **Thu nhỏ/Phóng to**: Tùy chọn xem gọn
-- **Nút trích xuất thủ công**: Tùy chọn dự phòng cho việc nhập JSON thủ công
-
-### Tính năng tự động hoàn thành
-- **Phát hiện thông minh**: Tự động nhận diện các phần tử câu hỏi trên trang
-- **Hỗ trợ đa định dạng**:
-  - Dropdown Select2
-  - Nút radio và checkbox
-  - Nhập văn bản và textarea
-  - Phần tử kéo thả
-  - Dropdown câu hỏi ghép đôi
-- **Định vị dựa trên tọa độ**: Vị trí chính xác cho câu hỏi kéo thả
-- **Mô phỏng sự kiện**: Kích hoạt sự kiện thay đổi phù hợp cho xác thực form
-
-## 📋 Cài đặt & Sử dụng
-
-### Bắt đầu nhanh
-1. Mở Console của trình duyệt (F12)
-2. Copy và paste toàn bộ nội dung của `paste-to-console.js`
-3. Nhấn Enter để thực thi
-4. Bắt đầu làm bài kiểm tra - đáp án sẽ được trích xuất tự động!
-
-### Trích xuất thủ công
-Nếu phát hiện tự động thất bại:
-1. Nhấp vào nút "🎌 Extract Answers" (góc trên-trái)
-2. Paste phản hồi JSON từ tab Network
-3. Đáp án sẽ được hiển thị trong popup
-
-## 🎯 Loại câu hỏi được hỗ trợ
-
-### Loại 3: Kéo thả với thứ tự
-- Hiển thị các mục với thứ tự và chỉ số chính xác
-- Tự động điền bằng cách định vị phần tử đúng
-
-### Loại 4: Kéo thả định vị
-- Hiển thị nội dung với tọa độ chính xác (x, y)
-- Tự động di chuyển phần tử kéo được đến vị trí đúng
-
-### Loại 5: Câu hỏi ghép đôi
-- Hiển thị cặp câu hỏi → đáp án
-- Tự động chọn đúng ghép trong menu dropdown
-
-### Loại 7: Câu trả lời ngắn/Điền vào chỗ trống
-- Hiển thị đáp án đúng với thứ tự và loại
-- Điền tự động vào ô nhập văn bản
-
-### Câu hỏi tiêu chuẩn
-- Trắc nghiệm (nút radio)
-- Chọn nhiều (checkbox)
-- Nhập văn bản và textarea
-- Lựa chọn dropdown
-
-## 🤖 Điều khiển tự động hoàn thành
-
-### Chuyển đổi tự động hoàn thành
-- Nhấp vào nút **🤖** trong header popup
-- Nền xanh = Bật, Nền xám = Tắt
-- Trạng thái được ghi vào console
-
-### Tự động điền thủ công
-- Nhấp vào nút **🚀** để kích hoạt tự động điền ngay lập tức
-- Cũng có sẵn như nút "🤖 Auto-Fill" trong footer popup
-
-### Hành vi tự động điền
-- Xử lý câu hỏi tuần tự với độ trễ 500ms
-- Kích hoạt sự kiện phù hợp cho xác thực form
-- Ghi tiến trình vào console để debug
-
-## 🔧 Chi tiết kỹ thuật
-
-### Chặn API
-Script giám sát các endpoint này:
-- `quiz-submission-check-answer` (XMLHttpRequest)
-- `quiz-submission-check-answer` (Fetch API)
-
-### Hỗ trợ cấu trúc JSON
-- **Cấu trúc mới**: Mảng `questions` với dữ liệu câu hỏi lồng nhau
-- **Cấu trúc cũ**: Mảng `answers` trực tiếp (tương thích ngược)
-
-### Phát hiện phần tử
-- Sử dụng nhiều chiến lược để tìm phần tử form
-- Hỗ trợ tích hợp jQuery/Select2
-- Xử lý các framework CSS và triển khai tùy chỉnh khác nhau
-
-## 📚 Hàm có sẵn
-
-Sau khi tải script, các hàm toàn cục này có sẵn:
-
-```javascript
-// Trích xuất đáp án từ phản hồi JSON
-nixExtract(jsonResponse)
-
-// Chuyển đổi hiển thị popup
-nixToggle()
-
-// Kích hoạt tự động điền thủ công
-nixAutoFill()
+```
+┌─────────────────────────────────────┐
+│ 🤖 NIX Helper (Tampermonkey)    _ × │
+├─────────────────────────────────────┤
+│                                     │
+│         📡 Waiting for quiz...      │
+│                                     │
+├─────────────────────────────────────┤
+│  🚀 Auto-Fill  │  📋 Copy All       │
+└─────────────────────────────────────┘
 ```
 
-## 🎨 Thành phần giao diện
+### Bước 3: Làm bài quiz
 
-### Điều khiển header
-- **👁️** - Chuyển đổi hiển thị popup
-- **🤖/🔧** - Chuyển đổi chế độ tự động hoàn thành
-- **🚀** - Kích hoạt tự động điền thủ công
-- **➖/➕** - Thu nhỏ/phóng to popup
-- **×** - Đóng popup
+Bắt đầu làm quiz bình thường. Khi bạn submit hoặc check đáp án:
 
-### Hành động footer
-- **📋 Copy All** - Copy tất cả đáp án vào clipboard
-- **🤖 Auto-Fill** - Kích hoạt tự động hoàn thành
-- **❌ Close** - Đóng cửa sổ popup
+- Script tự động bắt response từ server
+- Đáp án hiển thị trong popup
+- Mỗi loại câu hỏi có màu riêng
 
-## 🔍 Đầu ra Console
+### Bước 4: Sử dụng đáp án
 
-Script cung cấp ghi log console chi tiết:
-- ✅ Xác nhận thiết lập và tính năng có sẵn
-- 🎯 Phát hiện phản hồi bài kiểm tra
-- 📚 Hiển thị đáp án có tổ chức theo câu hỏi
-- 🤖 Tiến trình và kết quả tự động điền
-- ⚠️ Cảnh báo cho phần tử thiếu hoặc lỗi
+| Nút              | Chức năng                           |
+| ---------------- | ----------------------------------- |
+| 🚀 **Auto-Fill** | Tự động điền tất cả đáp án vào form |
+| 📋 **Copy All**  | Copy đáp án ra clipboard            |
+| **\_**           | Thu nhỏ popup                       |
+| **×**            | Đóng popup                          |
+
+---
+
+## 🎨 Giao diện hiển thị đáp án
+
+Mỗi loại câu hỏi được hiển thị với màu sắc và icon riêng:
+
+```
+┌─ 🎯 Q1: Sắp xếp theo thứ tự ────────────────┐
+│  Type 3 • 4 answer(s)                       │
+│  ┌────────────────────────────────────────┐ │
+│  │ 📍 Drag "Bước 1" → Position #1         │ │
+│  │ 📍 Drag "Bước 2" → Position #2         │ │
+│  │ 📍 Drag "Bước 3" → Position #3         │ │
+│  └────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+
+┌─ 🔗 Q2: Ghép nối thuật ngữ ─────────────────┐
+│  Type 5 • 3 answer(s)                       │
+│  ┌────────────────────────────────────────┐ │
+│  │ 🔗 HTML → Ngôn ngữ đánh dấu            │ │
+│  │ 🔗 CSS → Định dạng giao diện           │ │
+│  │ 🔗 JS → Lập trình client               │ │
+│  └────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+```
+
+---
 
 ## ⚙️ Cấu hình
 
-### Cài đặt tự động hoàn thành
-- **Trạng thái mặc định**: Tắt (cần kích hoạt thủ công)
-- **Độ trễ giữa các câu hỏi**: 500ms
-- **Thời gian chờ hoàn thành**: Dựa trên số câu hỏi + 1 giây
+Chỉnh sửa phần `CONFIG` trong script:
 
-### Định vị giao diện
-- **Vị trí mặc định**: Góc trên-phải (cách mép 20px)
-- **Có thể kéo**: Toàn bộ popup có thể định vị lại
-- **Z-Index**: 10000 (hiện trên hầu hết phần tử trang)
-
-## 🛠️ Khắc phục sự cố
-
-### Tự động điền không hoạt động
-1. Kiểm tra xem tự động hoàn thành có được bật không (nút 🤖 phải màu xanh)
-2. Xác minh các phần tử câu hỏi đã được tải trên trang
-3. Kiểm tra console để tìm thông báo lỗi
-4. Thử tự động điền thủ công với nút 🚀
-
-### Đáp án không hiện
-1. Đảm bảo bạn đang ở trang bài kiểm tra với câu hỏi hoạt động
-2. Kiểm tra tab Network cho các request `quiz-submission-check-answer`
-3. Thử trích xuất thủ công với nút "🎌 Extract Answers"
-
-### Vấn đề kéo thả
-1. Xác minh tọa độ được phát hiện chính xác
-2. Kiểm tra xem jQuery UI draggable có sẵn không
-3. Đảm bảo container vùng kéo tồn tại trên trang
-
-## 🔒 Bảo mật & Quyền riêng tư
-
-- **Xử lý cục bộ**: Tất cả hoạt động diễn ra trong trình duyệt của bạn
-- **Không truyền dữ liệu**: Script không gửi dữ liệu đến server bên ngoài
-- **Chỉ truy cập Console**: Cần cài đặt thủ công qua console developer
-- **Dựa trên phiên**: Không lưu trữ hoặc theo dõi liên tục
-
-## 📄 Giấy phép
-
-Dự án này được cấp phép theo Giấy phép MIT - xem file [LICENSE](LICENSE) để biết chi tiết.
-
-Dự án này được cung cấp cho mục đích giáo dục. Vui lòng đảm bảo tuân thủ các chính sách toàn vẹn học thuật của tổ chức bạn.
-
-## 🤝 Đóng góp
-
-Hãy thoải mái gửi vấn đề và yêu cầu cải tiến. Khi đóng góp:
-1. Kiểm tra kỹ lưỡng với các loại câu hỏi khác nhau
-2. Duy trì tương thích với các tính năng hiện có
-3. Tuân theo phong cách code và quy ước comment hiện có
-4. Cập nhật tài liệu cho các tính năng mới
+```javascript
+const CONFIG = {
+    DEBUG: false, // Bật console log chi tiết
+    AUTO_FILL_DELAY: 500 // Độ trễ giữa mỗi câu (ms)
+};
+```
 
 ---
 
-**Lưu ý**: Công cụ này được thiết kế để hỗ trợ học tập và nên được sử dụng có trách nhiệm theo chính sách của tổ chức giáo dục của bạn.
+## 🛠️ Khắc phục sự cố
+
+<details>
+<summary><b>❓ Script không chạy trên Tampermonkey</b></summary>
+
+1. Kiểm tra Tampermonkey đã enabled
+2. Kiểm tra URL match pattern trong script header
+3. Thử refresh trang (F5)
+4. Kiểm tra Console (F12) có lỗi không
+
+</details>
+
+<details>
+<summary><b>❓ Đáp án không hiện</b></summary>
+
+1. Đảm bảo đang ở trang quiz với câu hỏi
+2. Thử submit/check answer để trigger API
+3. Kiểm tra Network tab có request `quiz-submission-check-answer`
+4. Bật DEBUG mode để xem log chi tiết
+
+</details>
+
+<details>
+<summary><b>❓ Auto-Fill không hoạt động</b></summary>
+
+1. Đợi trang load hoàn toàn
+2. Kiểm tra Console có lỗi JavaScript
+3. Một số loại câu hỏi cần jQuery UI
+4. Thử fill thủ công theo thông tin hiển thị
+
+</details>
+
+---
+
+## 🔒 Bảo mật & Quyền riêng tư
+
+| Đặc điểm                 | Mô tả                                  |
+| ------------------------ | -------------------------------------- |
+| 🏠 **Xử lý cục bộ**      | Mọi thứ chạy trong trình duyệt của bạn |
+| 🚫 **Không gửi dữ liệu** | Script không kết nối server bên ngoài  |
+| 🔐 **Không lưu trữ**     | Đáp án chỉ tồn tại trong session       |
+
+---
+
+## 📁 Cấu trúc dự án
+
+```
+nix-lms-answer-checker/
+├── 📄 paste-to-console.js    # Phiên bản paste vào Console
+├── 📁 src/
+│   └── 🔧 nix-helper.user.js # Phiên bản Tampermonkey
+├── 📁 tests/fixtures/         # Sample JSON để test
+├── 📁 .agent/workflows/       # Hướng dẫn cho developer
+├── 📄 package.json
+├── 📄 README.md
+└── 📄 LICENSE
+```
+
+---
+
+## 🤝 Đóng góp
+
+Mọi đóng góp đều được hoan nghênh! Xem [workflows](.agent/workflows/) để biết
+cách:
+
+- Thêm loại câu hỏi mới
+- Debug và test
+- Build project
+
+---
+
+## 📄 License
+
+MIT License - Xem [LICENSE](LICENSE)
+
+> ⚠️ **Lưu ý**: Công cụ này chỉ dành cho mục đích học tập. Hãy sử dụng có trách
+> nhiệm và tuân thủ quy định của tổ chức giáo dục.
+
+---
+
+<h2 id="-english">🇬🇧 English</h2>
+
+<details>
+<summary><b>Click to expand English documentation</b></summary>
+
+### Quick Start
+
+**Tampermonkey (Recommended):**
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/)
+2. Create new script → paste content from `src/nix-helper.user.js`
+3. Save and visit NIX LMS
+
+**Console:**
+
+1. Open DevTools (F12)
+2. Paste `paste-to-console.js` content
+3. Start quiz
+
+### Features
+
+- 📡 Auto-capture quiz answers from API
+- 🎯 Smart auto-fill for all question types
+- 🎨 Beautiful draggable popup UI
+- 📋 One-click copy answers
+
+### Supported Question Types
+
+- Type 3: Drag & drop ordering
+- Type 4: Drag & drop positioning
+- Type 5: Matching questions
+- Type 7: Fill in the blank
+- Standard: Multiple choice, checkboxes
+
+### Troubleshooting
+
+- Enable DEBUG mode for detailed logs
+- Check Console (F12) for errors
+- Ensure you're on a quiz page
+
+</details>
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/AtelierMizumi">AtelierMizumi</a>
+</p>
