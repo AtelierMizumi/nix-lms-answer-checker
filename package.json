@@ -3,9 +3,10 @@
   "version": "2.0.0",
   "description": "Automatically extracts and displays answers from NIX Digital LMS quizzes",
   "main": "paste-to-console.js",
+  "type": "module",
   "scripts": {
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
+    "lint": "eslint src/ paste-to-console.js",
+    "lint:fix": "eslint src/ paste-to-console.js --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "echo 'Build script - TODO: Add bundler'",
@@ -29,7 +30,11 @@
     "url": "https://github.com/AtelierMizumi/nix-lms-answer-checker/issues"
   },
   "homepage": "https://github.com/AtelierMizumi/nix-lms-answer-checker#readme",
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1"
+  },
   "engines": {
     "node": ">=18.0.0"
   }

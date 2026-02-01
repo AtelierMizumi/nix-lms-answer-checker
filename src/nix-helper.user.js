@@ -19,7 +19,7 @@
 
 /**
  * NIX Digital LMS Answer Extractor - Tampermonkey Edition
- * 
+ *
  * ARCHITECTURE NOTES:
  * 1. Fully encapsulated in IIFE to prevent global scope pollution (Anti-cheat evasion).
  * 2. Modular design: Network, Parser, Solver, UI, Utils.
@@ -38,7 +38,7 @@
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions',
             TYPE_3_DROP_ZONE: '.ui-droppable, .static',
-            TYPE_3_DRAGGABLE: '.draggable',
+            TYPE_3_DRAGGABLE: '.draggable'
         }
     };
 
@@ -60,8 +60,8 @@
 
         /**
          * Wait for an element to appear in the DOM
-         * @param {string} selector 
-         * @param {HTMLElement} parent 
+         * @param {string} selector
+         * @param {HTMLElement} parent
          * @param {number} timeout
          * @returns {Promise<Element>}
          */
@@ -134,7 +134,7 @@
         parse(jsonString) {
             try {
                 const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-                let extracted = [];
+                const extracted = [];
 
                 if (data.questions && Array.isArray(data.questions)) {
                     data.questions.forEach((q, index) => {
@@ -154,7 +154,7 @@
         },
 
         processQuestion(q, qWrapper, index) {
-            let result = {
+            const result = {
                 id: q.id,
                 order: index + 1,
                 title: this.cleanHtml(q.title || ''),
@@ -231,7 +231,7 @@
                                 }
                             });
                         }
-                    } catch (e) { /* Ignore parse errors */ }
+                    } catch (_e) { /* Ignore parse errors */ }
                 });
             }
             // STRATEGY: STANDARD (Multiple Choice, Checkbox)
@@ -667,32 +667,102 @@
                         ${this.getTypeIcon(q.type)} Q${q.order}: ${q.title}
                     </div>
                     <div style="font-size:11px;color:#666;margin-bottom:6px;">Type ${q.type} • ${q.answers.length} answer(s)</div>
+                    ${this.renderCombinedText(q)}
                     ${q.answers.map(ans => this.renderAnswerItem(q.type, ans)).join('')}
                 </div>
             `).join('');
 
+            // Bind copy events for combined text
+            content.querySelectorAll('.nix-copy-combined').forEach(btn => {
+                btn.onclick = (e) => {
+                    const text = e.target.dataset.text;
+                    Utils.copyToClipboard(text).then(() => {
+                        const orig = e.target.textContent;
+                        e.target.textContent = '✅';
+                        setTimeout(() => { e.target.textContent = orig; }, 1000);
+                    });
+                };
+            });
+
             this.root.querySelector('#nix-header span').innerHTML = `🤖 NIX Helper <small style="opacity:0.8">(${answers.length} Questions)</small>`;
+        },
+
+        /**
+         * Get combined text for questions that can be merged
+         * - Type 3: Combine ordered items into single string
+         * - Type 5: Show answer parts combined
+         * - Type 7: Combine fill-in answers
+         */
+        getCombinedText(questionData) {
+            const type = questionData.type;
+            const answers = questionData.answers;
+
+            if (type === 3) {
+                // Drag & drop ordering: combine in correct order
+                return answers.map(a => a.content).join('');
+            }
+
+            if (type === 5) {
+                // Matching: combine just the answer parts (right side)
+                return answers.map(a => a.answer).join(' ');
+            }
+
+            if (type === 7) {
+                // Fill in blank: combine all answers
+                return answers.map(a => a.content).join(' ');
+            }
+
+            // For standard types, just combine answers
+            if (answers.length > 0) {
+                return answers.map(a => a.content).join(' ');
+            }
+
+            return null;
+        },
+
+        /**
+         * Render combined text box with copy button
+         * This allows users to hover with dictionary plugins (like 10ten)
+         */
+        renderCombinedText(questionData) {
+            const combined = this.getCombinedText(questionData);
+            if (!combined) return '';
+
+            const bgColor = this.getTypeColor(questionData.type) + '20'; // 20% opacity
+            const borderColor = this.getTypeColor(questionData.type);
+
+            return `
+                <div style="background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    <span class="nix-combined-text" style="flex: 1; font-size: 16px; font-weight: 500; color: #333; user-select: text; cursor: text;" title="Hover để tra từ điển">${combined}</span>
+                    <button class="nix-copy-combined" data-text="${combined.replace(/"/g, '&quot;')}" style="background: ${borderColor}; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; white-space: nowrap;">📋 Copy</button>
+                </div>
+            `;
         },
 
         renderAnswerItem(type, ans) {
             if (type === 3) {
                 return `<div style="background:#fff3cd; padding: 6px 8px; border-left: 3px solid #ffc107; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    📍 Drag <strong>"${ans.content}"</strong> → Position <strong>#${ans.targetIndex}</strong>
+                    <span style="color:#856404;">#${ans.targetIndex}</span> → <strong style="user-select:text;">${ans.content}</strong>
                     ${ans.reusable ? ' <span style="color:#666;">(Reusable)</span>' : ''}
                 </div>`;
             }
             if (type === 4) {
                 return `<div style="background:#d1ecf1; padding: 6px 8px; border-left: 3px solid #17a2b8; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    📍 <strong>"${ans.content}"</strong> at (${ans.coordinates.x}, ${ans.coordinates.y})
+                    📍 <strong style="user-select:text;">${ans.content}</strong> at (${ans.coordinates.x}, ${ans.coordinates.y})
                 </div>`;
             }
             if (type === 5) {
                 return `<div style="background:#d4edda; padding: 6px 8px; border-left: 3px solid #28a745; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    🔗 <strong>${ans.question}</strong> → ${ans.answer}
+                    <span style="color:#666;">${ans.question}</span> → <strong style="user-select:text;">${ans.answer}</strong>
+                </div>`;
+            }
+            if (type === 7) {
+                return `<div style="background:#e2d9f3; padding: 6px 8px; border-left: 3px solid #6f42c1; margin: 4px 0; border-radius: 3px; font-size: 12px;">
+                    <span style="color:#666;">[${ans.order}]</span> <strong style="user-select:text;">${ans.content}</strong>
                 </div>`;
             }
             return `<div style="background:#e7f3ff; padding: 6px 8px; border-left: 3px solid #007bff; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                ✓ ${ans.content}
+                ✓ <span style="user-select:text;">${ans.content}</span>
             </div>`;
         },
 
