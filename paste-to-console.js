@@ -439,49 +439,78 @@
         async handleType7(container, questionData) {
             Utils.log('🎯 Type 7 - Fill in the Blank / Dropdown Choice');
 
-            for (const answer of questionData.answers) {
-                // Handle dropdown-choice (radio button selection)
-                if (answer.type === 'dropdown-choice') {
-                    Utils.log(`🔍 Looking for radio with text: "${answer.content}"`);
+            // Get all select dropdowns in order - each corresponds to a blank [[1]], [[2]], etc.
+            const selects = container.querySelectorAll('select');
+            Utils.log(`📋 Found ${selects.length} dropdown(s) in container`);
 
-                    const radios = container.querySelectorAll('input[type="radio"]');
+            for (const answer of questionData.answers) {
+                // Handle dropdown-choice (select dropdown by order)
+                if (answer.type === 'dropdown-choice') {
+                    const dropdownIndex = answer.order - 1; // order is 1-indexed
+                    Utils.log(`🔍 [Blank ${answer.order}] Looking for: "${answer.content.trim()}"`);
+
                     let found = false;
 
-                    for (const radio of radios) {
-                        const label = radio.closest('label') || radio.parentElement;
-                        const row = radio.closest('.d-flex, .row, .form-group, .answer-option, li');
-                        const textContainer = row || label;
+                    // First try: Target specific dropdown by order
+                    if (selects[dropdownIndex]) {
+                        const select = selects[dropdownIndex];
+                        const options = select.querySelectorAll('option');
 
-                        if (textContainer && textContainer.textContent.includes(answer.content)) {
-                            radio.checked = true;
-                            radio.click();
-                            radio.dispatchEvent(new Event('change', { bubbles: true }));
-                            Utils.log(`✅ Selected radio: "${answer.content.substring(0, 30)}..."`);
-                            found = true;
-                            break;
-                        }
-                    }
+                        for (const option of options) {
+                            const optionText = option.textContent.trim();
+                            const answerText = answer.content.trim();
 
-                    // Also try select dropdowns
-                    if (!found) {
-                        const selects = container.querySelectorAll('select');
-                        for (const select of selects) {
-                            const options = select.querySelectorAll('option');
-                            for (const option of options) {
-                                if (option.textContent.includes(answer.content)) {
-                                    select.value = option.value;
-                                    select.dispatchEvent(new Event('change', { bubbles: true }));
-                                    Utils.log(`✅ Selected dropdown: "${answer.content.substring(0, 30)}..."`);
-                                    found = true;
-                                    break;
-                                }
+                            if (
+                                optionText === answerText ||
+                                optionText.includes(answerText) ||
+                                answerText.includes(optionText)
+                            ) {
+                                select.value = option.value;
+                                select.dispatchEvent(new Event('change', { bubbles: true }));
+                                Utils.log(`✅ [Blank ${answer.order}] Selected: "${optionText}"`);
+                                found = true;
+                                break;
                             }
-                            if (found) break;
+                        }
+                    }
+
+                    // Fallback: Try radio buttons grouped by blank
+                    if (!found) {
+                        // Look for radio groups - they might be organized by name attribute
+                        const allRadios = container.querySelectorAll('input[type="radio"]');
+                        const radioGroups = {};
+
+                        allRadios.forEach(radio => {
+                            const name = radio.name || 'default';
+                            if (!radioGroups[name]) radioGroups[name] = [];
+                            radioGroups[name].push(radio);
+                        });
+
+                        const groupNames = Object.keys(radioGroups);
+                        const targetGroup = radioGroups[groupNames[dropdownIndex]] || [];
+
+                        for (const radio of targetGroup) {
+                            const label = radio.closest('label') || radio.parentElement;
+                            const row = radio.closest('.d-flex, .row, .form-group, .answer-option, li');
+                            const textContainer = row || label;
+
+                            if (textContainer && textContainer.textContent.includes(answer.content.trim())) {
+                                radio.checked = true;
+                                radio.click();
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                Utils.log(
+                                    `✅ [Blank ${answer.order}] Selected radio: "${answer.content.substring(0, 30)}..."`
+                                );
+                                found = true;
+                                break;
+                            }
                         }
                     }
 
                     if (!found) {
-                        Utils.log(`⚠️ Could not find element for: "${answer.content.substring(0, 30)}..."`);
+                        Utils.log(
+                            `⚠️ [Blank ${answer.order}] Could not find element for: "${answer.content.substring(0, 30)}..."`
+                        );
                     }
                 }
                 // Handle regular text input
