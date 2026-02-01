@@ -1,41 +1,45 @@
 {
-  "name": "nix-lms-answer-checker",
-  "version": "2.0.0",
-  "description": "Automatically extracts and displays answers from NIX Digital LMS quizzes",
-  "main": "paste-to-console.js",
-  "type": "module",
-  "scripts": {
-    "lint": "eslint src/ paste-to-console.js",
-    "lint:fix": "eslint src/ paste-to-console.js --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "build": "echo 'Build script - TODO: Add bundler'",
-    "test": "echo 'Test script - TODO: Add test runner'"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/AtelierMizumi/nix-lms-answer-checker.git"
-  },
-  "keywords": [
-    "lms",
-    "nix",
-    "quiz",
-    "helper",
-    "tampermonkey",
-    "userscript"
-  ],
-  "author": "AtelierMizumi",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/AtelierMizumi/nix-lms-answer-checker/issues"
-  },
-  "homepage": "https://github.com/AtelierMizumi/nix-lms-answer-checker#readme",
-  "devDependencies": {
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.8.1"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+    "name": "nix-lms-answer-checker",
+    "version": "2.0.0",
+    "description": "Automatically extracts and displays answers from NIX Digital LMS quizzes",
+    "main": "paste-to-console.js",
+    "type": "module",
+    "scripts": {
+        "lint": "eslint src/ paste-to-console.js",
+        "lint:fix": "eslint src/ paste-to-console.js --fix",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "build": "echo 'Build script - TODO: Add bundler'"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/AtelierMizumi/nix-lms-answer-checker.git"
+    },
+    "keywords": [
+        "lms",
+        "nix",
+        "quiz",
+        "helper",
+        "tampermonkey",
+        "userscript"
+    ],
+    "author": "AtelierMizumi",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/AtelierMizumi/nix-lms-answer-checker/issues"
+    },
+    "homepage": "https://github.com/AtelierMizumi/nix-lms-answer-checker#readme",
+    "devDependencies": {
+        "eslint": "^9.39.2",
+        "eslint-config-prettier": "^10.1.8",
+        "jsdom": "^27.4.0",
+        "prettier": "^3.8.1",
+        "vitest": "^4.0.18"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
 }

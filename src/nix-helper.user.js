@@ -66,7 +66,7 @@
          * @returns {Promise<Element>}
          */
         waitForElement(selector, parent = document, timeout = 3000) {
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
                 if (parent.querySelector(selector)) {
                     return resolve(parent.querySelector(selector));
                 }
@@ -115,7 +115,8 @@
          * Trigger native value setter for React/Vue compatibility
          */
         setNativeValue(element, value) {
-            const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set ||
+            const valueSetter =
+                Object.getOwnPropertyDescriptor(element, 'value')?.set ||
                 Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value')?.set;
 
             if (valueSetter) {
@@ -167,7 +168,11 @@
             if (q.type === 3) {
                 if (q.answers && Array.isArray(q.answers)) {
                     q.answers.forEach(ans => {
-                        if (ans.draggable_answer && ans.draggable_answer.correct_index !== null && ans.draggable_answer.correct_index !== undefined) {
+                        if (
+                            ans.draggable_answer &&
+                            ans.draggable_answer.correct_index !== null &&
+                            ans.draggable_answer.correct_index !== undefined
+                        ) {
                             result.answers.push({
                                 content: this.cleanHtml(ans.content),
                                 targetIndex: ans.draggable_answer.correct_index,
@@ -215,12 +220,27 @@
                     }
                 });
             }
-            // STRATEGY: TYPE 7 (Fill in blank / Short Answer)
+            // STRATEGY: TYPE 7 (Fill in blank / Short Answer / Single Choice Dropdown)
             else if (q.type === 7 && q.answers) {
                 q.answers.forEach((ans, idx) => {
                     try {
                         const contentObj = JSON.parse(ans.content);
-                        if (contentObj.child_answers) {
+
+                        // Handle single-choice dropdown/radio type
+                        if (contentObj.type === 'single-choice' && contentObj.child_answers) {
+                            const correctIdx = contentObj.correctAnswerIndex;
+                            if (correctIdx !== undefined && contentObj.child_answers[correctIdx]) {
+                                result.answers.push({
+                                    content: contentObj.child_answers[correctIdx].content,
+                                    allOptions: contentObj.child_answers.map(c => c.content),
+                                    correctIndex: correctIdx,
+                                    order: idx + 1,
+                                    type: 'dropdown-choice'
+                                });
+                            }
+                        }
+                        // Handle regular text fill-in
+                        else if (contentObj.child_answers) {
                             contentObj.child_answers.forEach(child => {
                                 if (child.content) {
                                     result.answers.push({
@@ -231,17 +251,21 @@
                                 }
                             });
                         }
-                    } catch (_e) { /* Ignore parse errors */ }
+                    } catch (_e) {
+                        /* Ignore parse errors */
+                    }
                 });
             }
             // STRATEGY: STANDARD (Multiple Choice, Checkbox)
             else if (q.answers) {
-                q.answers.filter(a => a.correct === 1).forEach(a => {
-                    result.answers.push({
-                        content: this.cleanHtml(a.content),
-                        type: 'choice'
+                q.answers
+                    .filter(a => a.correct === 1)
+                    .forEach(a => {
+                        result.answers.push({
+                            content: this.cleanHtml(a.content),
+                            type: 'choice'
+                        });
                     });
-                });
             }
 
             return result.answers.length > 0 ? result : null;
@@ -420,16 +444,63 @@
         },
 
         async handleType7(container, questionData) {
-            Utils.log('🎯 Type 7 - Fill in the Blank');
+            Utils.log('🎯 Type 7 - Fill in the Blank / Dropdown Choice');
 
-            const inputs = container.querySelectorAll('input[type="text"], textarea');
+            for (const answer of questionData.answers) {
+                // Handle dropdown-choice (radio button selection)
+                if (answer.type === 'dropdown-choice') {
+                    Utils.log(`🔍 Looking for radio with text: "${answer.content}"`);
 
-            questionData.answers.forEach((answer, idx) => {
-                if (inputs[idx]) {
-                    Utils.setNativeValue(inputs[idx], answer.content);
-                    Utils.log(`✅ Filled blank ${idx + 1}: "${answer.content}"`);
+                    const radios = container.querySelectorAll('input[type="radio"]');
+                    let found = false;
+
+                    for (const radio of radios) {
+                        const label = radio.closest('label') || radio.parentElement;
+                        const row = radio.closest('.d-flex, .row, .form-group, .answer-option, li');
+                        const textContainer = row || label;
+
+                        if (textContainer && textContainer.textContent.includes(answer.content)) {
+                            radio.checked = true;
+                            radio.click();
+                            radio.dispatchEvent(new Event('change', { bubbles: true }));
+                            Utils.log(`✅ Selected radio: "${answer.content.substring(0, 30)}..."`);
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    // Also try select dropdowns
+                    if (!found) {
+                        const selects = container.querySelectorAll('select');
+                        for (const select of selects) {
+                            const options = select.querySelectorAll('option');
+                            for (const option of options) {
+                                if (option.textContent.includes(answer.content)) {
+                                    select.value = option.value;
+                                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                                    Utils.log(`✅ Selected dropdown: "${answer.content.substring(0, 30)}..."`);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (found) break;
+                        }
+                    }
+
+                    if (!found) {
+                        Utils.log(`⚠️ Could not find element for: "${answer.content.substring(0, 30)}..."`);
+                    }
                 }
-            });
+                // Handle regular text input
+                else if (answer.type === 'text') {
+                    const inputs = container.querySelectorAll('input[type="text"], textarea');
+                    const idx = answer.order - 1;
+                    if (inputs[idx]) {
+                        Utils.setNativeValue(inputs[idx], answer.content);
+                        Utils.log(`✅ Filled blank ${answer.order}: "${answer.content}"`);
+                    }
+                }
+            }
         },
 
         async handleStandard(container, questionData) {
@@ -552,13 +623,15 @@
                 font-size: 13px;
             `;
 
-            const debugHtml = CONFIG.DEBUG ? `
+            const debugHtml = CONFIG.DEBUG
+                ? `
                 <div style="padding: 8px; border-bottom: 1px dashed #ccc; background: #f0f0f0;">
                     <button id="nix-btn-debug" style="width:100%;padding:6px;font-size:11px;cursor:pointer;background:#ff9800;color:white;border:none;border-radius:4px;font-weight:bold;">
                         🐞 Debug Mode: Paste JSON
                     </button>
                 </div>
-            ` : '';
+            `
+                : '';
 
             div.innerHTML = `
                 <div id="nix-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 12px; cursor: move; display: flex; justify-content: space-between; align-items: center; border-radius: 10px 10px 0 0;">
@@ -610,14 +683,18 @@
             };
 
             div.querySelector('#nix-btn-copy').onclick = () => {
-                const text = STATE.answers.map(q => {
-                    const answerText = q.answers.map(a => {
-                        if (q.type === 3) return `${a.content} → pos ${a.targetIndex}`;
-                        if (q.type === 5) return `${a.question} → ${a.answer}`;
-                        return a.content;
-                    }).join('\n');
-                    return `Q${q.order}: ${q.title}\n${answerText}`;
-                }).join('\n\n');
+                const text = STATE.answers
+                    .map(q => {
+                        const answerText = q.answers
+                            .map(a => {
+                                if (q.type === 3) return `${a.content} → pos ${a.targetIndex}`;
+                                if (q.type === 5) return `${a.question} → ${a.answer}`;
+                                return a.content;
+                            })
+                            .join('\n');
+                        return `Q${q.order}: ${q.title}\n${answerText}`;
+                    })
+                    .join('\n\n');
 
                 Utils.copyToClipboard(text).then(() => {
                     const btn = div.querySelector('#nix-btn-copy');
@@ -634,7 +711,9 @@
             // Debug Event
             if (CONFIG.DEBUG) {
                 div.querySelector('#nix-btn-debug').onclick = () => {
-                    const json = prompt('📝 Paste the JSON response from Network tab:\n\n(The entire response from quiz-submission-check-answer endpoint)');
+                    const json = prompt(
+                        '📝 Paste the JSON response from Network tab:\n\n(The entire response from quiz-submission-check-answer endpoint)'
+                    );
                     if (json) {
                         try {
                             const answers = Parser.parse(json);
@@ -657,11 +736,14 @@
         renderAnswers(answers) {
             const content = this.root.querySelector('#nix-content');
             if (!answers.length) {
-                content.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">No answers found in response.</div>';
+                content.innerHTML =
+                    '<div style="padding:20px; text-align:center; color:#999;">No answers found in response.</div>';
                 return;
             }
 
-            content.innerHTML = answers.map(q => `
+            content.innerHTML = answers
+                .map(
+                    q => `
                 <div style="margin-bottom: 12px; padding: 10px; background: white; border-radius: 6px; border-left: 4px solid ${this.getTypeColor(q.type)}; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="font-weight: bold; margin-bottom: 8px; color: #333; font-size: 14px;">
                         ${this.getTypeIcon(q.type)} Q${q.order}: ${q.title}
@@ -670,21 +752,26 @@
                     ${this.renderCombinedText(q)}
                     ${q.answers.map(ans => this.renderAnswerItem(q.type, ans)).join('')}
                 </div>
-            `).join('');
+            `
+                )
+                .join('');
 
             // Bind copy events for combined text
             content.querySelectorAll('.nix-copy-combined').forEach(btn => {
-                btn.onclick = (e) => {
+                btn.onclick = e => {
                     const text = e.target.dataset.text;
                     Utils.copyToClipboard(text).then(() => {
                         const orig = e.target.textContent;
                         e.target.textContent = '✅';
-                        setTimeout(() => { e.target.textContent = orig; }, 1000);
+                        setTimeout(() => {
+                            e.target.textContent = orig;
+                        }, 1000);
                     });
                 };
             });
 
-            this.root.querySelector('#nix-header span').innerHTML = `🤖 NIX Helper <small style="opacity:0.8">(${answers.length} Questions)</small>`;
+            this.root.querySelector('#nix-header span').innerHTML =
+                `🤖 NIX Helper <small style="opacity:0.8">(${answers.length} Questions)</small>`;
         },
 
         /**
@@ -757,6 +844,13 @@
                 </div>`;
             }
             if (type === 7) {
+                // Dropdown choice shows the correct answer prominently
+                if (ans.type === 'dropdown-choice') {
+                    return `<div style="background:#e2d9f3; padding: 8px 10px; border-left: 3px solid #6f42c1; margin: 4px 0; border-radius: 3px; font-size: 13px;">
+                        ✅ <strong style="user-select:text;">${ans.content}</strong>
+                    </div>`;
+                }
+                // Regular text fill-in
                 return `<div style="background:#e2d9f3; padding: 6px 8px; border-left: 3px solid #6f42c1; margin: 4px 0; border-radius: 3px; font-size: 12px;">
                     <span style="color:#666;">[${ans.order}]</span> <strong style="user-select:text;">${ans.content}</strong>
                 </div>`;
@@ -788,9 +882,13 @@
 
         setupDrag() {
             const header = this.root.querySelector('#nix-header');
-            let isDragging = false, startX, startY, initLeft, initTop;
+            let isDragging = false,
+                startX,
+                startY,
+                initLeft,
+                initTop;
 
-            header.onmousedown = (e) => {
+            header.onmousedown = e => {
                 if (e.target.tagName === 'BUTTON') return;
                 isDragging = true;
                 startX = e.clientX;
@@ -801,7 +899,7 @@
                 header.style.cursor = 'grabbing';
             };
 
-            document.onmousemove = (e) => {
+            document.onmousemove = e => {
                 if (!isDragging) return;
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
@@ -891,5 +989,4 @@
     } else {
         start();
     }
-
 })();
