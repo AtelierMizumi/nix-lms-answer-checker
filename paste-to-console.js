@@ -266,8 +266,14 @@
                 q.answers
                     .filter(a => a.correct === 1)
                     .forEach(a => {
+                        const cleanedContent = this.cleanHtml(a.content);
+                        const isImageAnswer = a.content && a.content.includes('<img') && !cleanedContent;
                         result.answers.push({
-                            content: this.cleanHtml(a.content),
+                            content: cleanedContent,
+                            rawHtml: a.content, // Preserve raw HTML for image matching
+                            answerId: a.id, // Answer ID for precise matching
+                            correctIndex: q.answers.indexOf(a), // Index in answer list
+                            isImage: isImageAnswer,
                             type: 'choice'
                         });
                     });
@@ -630,9 +636,43 @@
             for (const answer of questionData.answers) {
                 // Try radio buttons
                 const radios = container.querySelectorAll('input[type="radio"]');
-                for (const radio of radios) {
+                const radioArray = Array.from(radios);
+
+                // Method 1: Image-based answer - match by index
+                if (answer.isImage && answer.correctIndex !== undefined) {
+                    const targetRadio = radioArray[answer.correctIndex];
+                    if (targetRadio) {
+                        targetRadio.checked = true;
+                        targetRadio.click();
+                        targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                        Utils.log(`✅ Selected image radio at index ${answer.correctIndex}`);
+                        return;
+                    }
+                }
+
+                // Method 2: Image match by src in rawHtml
+                if (answer.rawHtml && answer.rawHtml.includes('<img')) {
+                    const srcMatch = answer.rawHtml.match(/src=["']([^"']+)["']/);
+                    if (srcMatch) {
+                        const imgSrc = srcMatch[1];
+                        for (const radio of radioArray) {
+                            const label = radio.closest('label') || radio.parentElement;
+                            const img = label?.querySelector('img');
+                            if (img && img.src.includes(imgSrc.split('/').pop())) {
+                                radio.checked = true;
+                                radio.click();
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                Utils.log('✅ Selected radio by image src match');
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // Method 3: Text-based matching (original logic)
+                for (const radio of radioArray) {
                     const label = radio.closest('label') || radio.parentElement;
-                    if (label && label.textContent.includes(answer.content)) {
+                    if (label && answer.content && label.textContent.includes(answer.content)) {
                         radio.checked = true;
                         radio.dispatchEvent(new Event('change', { bubbles: true }));
                         Utils.log(`✅ Selected radio: "${answer.content}"`);
