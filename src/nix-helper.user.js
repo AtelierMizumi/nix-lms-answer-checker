@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NIX Digital LMS Answer Helper
 // @namespace    https://github.com/AtelierMizumi/nix-lms-answer-checker
-// @version      2.0.0
+// @version      2.1.0
 // @description  Automatically extracts and displays answers from NIX Digital LMS quizzes with auto-fill support
 // @author       AtelierMizumi
 // @match        *://*.nixedu.vn/*
@@ -15,6 +15,8 @@
 // @license      MIT
 // @homepage     https://github.com/AtelierMizumi/nix-lms-answer-checker
 // @supportURL   https://github.com/AtelierMizumi/nix-lms-answer-checker/issues
+// @updateURL    https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/src/nix-helper.user.js
+// @downloadURL  https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/src/nix-helper.user.js
 // ==/UserScript==
 
 /**
