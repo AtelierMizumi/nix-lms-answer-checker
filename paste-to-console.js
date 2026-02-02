@@ -18,8 +18,10 @@
         AUTO_FILL_DELAY: 500, // ms
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions', // Generic container
-            TYPE_3_DROP_ZONE: '.ui-droppable, .static', // Drop zones for Type 3
-            TYPE_3_DRAGGABLE: '.draggable' // Draggables for Type 3
+            // Type 3 - actual DOM selectors from Nix LMS
+            TYPE_3_DROP_ZONE: '.droppable-zone-question',
+            TYPE_3_DRAGGABLE: '.answer-text.ui-draggable',
+            TYPE_3_ANSWER_POOL: '.droppable-zone-answer'
         }
     };
 
@@ -138,23 +140,53 @@
             // Based on user log: answers have `draggable_answer.correct_index`
             if (q.type === 3) {
                 if (q.answers && Array.isArray(q.answers)) {
+                    // Step 1: Build a map of correct_index -> answer content
+                    const answerByIndex = new Map();
                     q.answers.forEach(ans => {
-                        // Check if it has draggable info with correct_index
-                        if (
-                            ans.draggable_answer &&
-                            ans.draggable_answer.correct_index !== null &&
-                            ans.draggable_answer.correct_index !== undefined
-                        ) {
-                            result.answers.push({
+                        if (ans.draggable_answer && ans.draggable_answer.correct_index != null) {
+                            answerByIndex.set(ans.draggable_answer.correct_index, {
                                 content: this.cleanHtml(ans.content),
-                                targetIndex: ans.draggable_answer.correct_index,
-                                reusable: ans.draggable_answer.reusable === 1,
-                                type: 'drag-order'
+                                reusable: ans.draggable_answer.reusable === 1
                             });
                         }
                     });
-                    // Sort by target index for display
-                    result.answers.sort((a, b) => a.targetIndex - b.targetIndex);
+
+                    // Step 2: Parse [[n]] pattern from question content to get physical positions
+                    const content = q.content || '';
+                    const placeholderRegex = /\[\[(\d+)\]\]/g;
+                    let match;
+                    let physicalPosition = 1;
+
+                    while ((match = placeholderRegex.exec(content)) !== null) {
+                        const placeholderNum = parseInt(match[1], 10);
+                        const answerInfo = answerByIndex.get(placeholderNum);
+
+                        if (answerInfo) {
+                            result.answers.push({
+                                content: answerInfo.content,
+                                targetIndex: physicalPosition, // Physical slot position
+                                placeholderNum: placeholderNum, // Original [[n]] number
+                                reusable: answerInfo.reusable,
+                                type: 'drag-order'
+                            });
+                        }
+                        physicalPosition++;
+                    }
+
+                    // Fallback: if no [[n]] pattern found, use old method
+                    if (result.answers.length === 0) {
+                        q.answers.forEach(ans => {
+                            if (ans.draggable_answer && ans.draggable_answer.correct_index != null) {
+                                result.answers.push({
+                                    content: this.cleanHtml(ans.content),
+                                    targetIndex: ans.draggable_answer.correct_index,
+                                    reusable: ans.draggable_answer.reusable === 1,
+                                    type: 'drag-order'
+                                });
+                            }
+                        });
+                        result.answers.sort((a, b) => a.targetIndex - b.targetIndex);
+                    }
                 }
             }
             // STRATEGY: TYPE 4 (Drag & Drop with coordinates)
@@ -234,8 +266,14 @@
                 q.answers
                     .filter(a => a.correct === 1)
                     .forEach(a => {
+                        const cleanedContent = this.cleanHtml(a.content);
+                        const isImageAnswer = a.content && a.content.includes('<img') && !cleanedContent;
                         result.answers.push({
-                            content: this.cleanHtml(a.content),
+                            content: cleanedContent,
+                            rawHtml: a.content, // Preserve raw HTML for image matching
+                            answerId: a.id, // Answer ID for precise matching
+                            correctIndex: q.answers.indexOf(a), // Index in answer list
+                            isImage: isImageAnswer,
                             type: 'choice'
                         });
                     });
@@ -311,49 +349,115 @@
         async handleType3(container, questionData) {
             Utils.log('🎯 Type 3 - Drag & Drop with Index');
 
-            // Find all draggable elements
+            // Find drop zones (where answers go) and draggables (source items)
+            const dropZones = container.querySelectorAll(CONFIG.SELECTORS.TYPE_3_DROP_ZONE);
             const draggables = container.querySelectorAll(CONFIG.SELECTORS.TYPE_3_DRAGGABLE);
 
-            if (draggables.length === 0) {
-                Utils.log('⚠️ No draggable elements found');
+            Utils.log(`📋 Found ${dropZones.length} drop zones, ${draggables.length} draggables`);
+
+            if (dropZones.length === 0) {
+                Utils.log('⚠️ No drop zones found');
                 return;
             }
 
-            // Process each answer
+            // Build a map of available draggable items
+            const draggableMap = new Map();
+            draggables.forEach(drag => {
+                const content = drag.getAttribute('data-content') || drag.textContent.trim();
+                const isReusable = drag.getAttribute('data-reusable') === '1';
+                if (!draggableMap.has(content) || isReusable) {
+                    draggableMap.set(content, { element: drag, reusable: isReusable, used: false });
+                }
+            });
+
             for (const answer of questionData.answers) {
-                // Find the draggable element matching this content
-                let foundDraggable = null;
-
-                for (const drag of draggables) {
-                    const dragText = drag.textContent.trim();
-                    if (dragText === answer.content) {
-                        foundDraggable = drag;
-                        break;
-                    }
-                }
-
-                if (!foundDraggable) {
-                    Utils.log(`⚠️ Draggable not found for: "${answer.content}"`);
-                    continue;
-                }
-
-                // Find the target drop zone by index
-                // The pattern in LMS is usually [[1]], [[2]], [[3]], etc.
-                const dropZones = container.querySelectorAll(CONFIG.SELECTORS.TYPE_3_DROP_ZONE);
-                const targetZone = dropZones[answer.targetIndex - 1]; // Convert 1-based to 0-based
+                const targetIndex = answer.targetIndex - 1; // Convert to 0-indexed
+                const targetZone = dropZones[targetIndex];
 
                 if (!targetZone) {
                     Utils.log(`⚠️ Drop zone not found for index: ${answer.targetIndex}`);
                     continue;
                 }
 
-                // Simulate drag and drop
-                await this.simulateDragDrop(foundDraggable, targetZone);
-                Utils.log(`✅ Dragged "${answer.content}" to position ${answer.targetIndex}`);
+                // Find the matching draggable
+                const draggableInfo = draggableMap.get(answer.content);
+                if (!draggableInfo) {
+                    Utils.log(`⚠️ Draggable not found for: "${answer.content}"`);
+                    continue;
+                }
 
-                // Small delay between drags
-                await new Promise(r => setTimeout(r, 200));
+                // Method 1: Try jQuery UI simulation if available
+                if (typeof $ !== 'undefined' && $(draggableInfo.element).data('ui-draggable')) {
+                    await this.simulateJQueryDragDrop(draggableInfo.element, targetZone, answer.content);
+                } else {
+                    // Method 2: Direct DOM manipulation fallback
+                    await this.directDragDropFill(draggableInfo.element, targetZone, answer.content);
+                }
+
+                Utils.log(`✅ [${answer.targetIndex}] Filled: "${answer.content}"`);
+
+                // Mark non-reusable items as used
+                if (!draggableInfo.reusable) {
+                    draggableInfo.used = true;
+                }
+
+                await new Promise(r => setTimeout(r, 150));
             }
+        },
+
+        async simulateJQueryDragDrop(draggable, dropZone, content) {
+            try {
+                const $draggable = $(draggable);
+                const $dropZone = $(dropZone);
+
+                // Clone for reusable or move for non-reusable
+                const isReusable = draggable.getAttribute('data-reusable') === '1';
+                const $element = isReusable ? $draggable.clone() : $draggable;
+
+                // Trigger jQuery UI events
+                $dropZone.trigger($.Event('drop', {
+                    target: dropZone,
+                    originalEvent: { dataTransfer: { getData: () => content } }
+                }));
+
+                // Set content in drop zone
+                $element.appendTo($dropZone);
+                $dropZone.addClass('filled');
+
+                // Trigger change event
+                $dropZone.trigger('change');
+            } catch (e) {
+                Utils.log(`jQuery simulation failed, falling back: ${e.message}`);
+                await this.directDragDropFill(draggable, dropZone, content);
+            }
+        },
+
+        async directDragDropFill(draggable, dropZone, content) {
+            // Direct DOM manipulation for jQuery UI drop zones
+            const isReusable = draggable.getAttribute('data-reusable') === '1';
+
+            // Clone the draggable element
+            const clone = draggable.cloneNode(true);
+            clone.classList.remove('ui-draggable-handle');
+            clone.style.position = 'relative';
+            clone.style.left = '0';
+            clone.style.top = '0';
+
+            // Clear and fill the drop zone
+            dropZone.innerHTML = '';
+            dropZone.appendChild(clone);
+            dropZone.classList.add('filled');
+            dropZone.classList.remove('quiz-answer-wrong');
+
+            // Hide original if not reusable
+            if (!isReusable) {
+                draggable.style.visibility = 'hidden';
+                draggable.style.position = 'absolute';
+            }
+
+            // Dispatch events to notify the page
+            dropZone.dispatchEvent(new Event('change', { bubbles: true }));
+            dropZone.dispatchEvent(new Event('drop', { bubbles: true, detail: { content } }));
         },
 
         // --- TYPE 4: Drag & Drop with Coordinates ---
@@ -440,48 +544,80 @@
             Utils.log('🎯 Type 7 - Fill in the Blank / Dropdown Choice');
 
             for (const answer of questionData.answers) {
-                // Handle dropdown-choice (radio button selection)
+                // Handle dropdown-choice (select dropdown by order)
                 if (answer.type === 'dropdown-choice') {
-                    Utils.log(`🔍 Looking for radio with text: "${answer.content}"`);
+                    const dropdownIndex = answer.order - 1; // order is 1-indexed
+                    const answerText = answer.content.trim();
+                    Utils.log(`🔍 [Blank ${answer.order}] Looking for: "${answerText}"`);
 
-                    const radios = container.querySelectorAll('input[type="radio"]');
                     let found = false;
 
-                    for (const radio of radios) {
-                        const label = radio.closest('label') || radio.parentElement;
-                        const row = radio.closest('.d-flex, .row, .form-group, .answer-option, li');
-                        const textContainer = row || label;
-
-                        if (textContainer && textContainer.textContent.includes(answer.content)) {
-                            radio.checked = true;
-                            radio.click();
-                            radio.dispatchEvent(new Event('change', { bubbles: true }));
-                            Utils.log(`✅ Selected radio: "${answer.content.substring(0, 30)}..."`);
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    // Also try select dropdowns
-                    if (!found) {
-                        const selects = container.querySelectorAll('select');
-                        for (const select of selects) {
-                            const options = select.querySelectorAll('option');
-                            for (const option of options) {
-                                if (option.textContent.includes(answer.content)) {
-                                    select.value = option.value;
-                                    select.dispatchEvent(new Event('change', { bubbles: true }));
-                                    Utils.log(`✅ Selected dropdown: "${answer.content.substring(0, 30)}..."`);
-                                    found = true;
-                                    break;
-                                }
+                    // Method 1: Standard <select> dropdowns
+                    const selects = container.querySelectorAll('select');
+                    if (selects[dropdownIndex]) {
+                        const select = selects[dropdownIndex];
+                        for (const option of select.querySelectorAll('option')) {
+                            const optionText = option.textContent.trim();
+                            if (optionText === answerText || optionText.includes(answerText) || answerText.includes(optionText)) {
+                                select.value = option.value;
+                                select.dispatchEvent(new Event('change', { bubbles: true }));
+                                Utils.log(`✅ [Blank ${answer.order}] Selected dropdown: "${optionText}"`);
+                                found = true;
+                                break;
                             }
-                            if (found) break;
+                        }
+                    }
+
+                    // Method 2: Radio buttons - find by text content match
+                    if (!found) {
+                        const allRadios = container.querySelectorAll('input[type="radio"]');
+                        for (const radio of allRadios) {
+                            // Check multiple possible text containers
+                            const label = radio.closest('label') || radio.parentElement;
+                            const row = radio.closest('.d-flex, .row, .form-group, .answer-option, li, .form-check');
+                            const textContent = (row?.textContent || label?.textContent || '').trim();
+
+                            if (textContent.includes(answerText) || answerText.includes(textContent)) {
+                                radio.checked = true;
+                                radio.click();
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                Utils.log(`✅ [Blank ${answer.order}] Selected radio: "${answerText}"`);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Method 3: Custom dropdown buttons (Bootstrap/custom UI)
+                    if (!found) {
+                        const dropdownItems = container.querySelectorAll('.dropdown-item, .dropdown-menu a, .dropdown-menu button, [data-value]');
+                        for (const item of dropdownItems) {
+                            const itemText = item.textContent.trim();
+                            if (itemText === answerText || itemText.includes(answerText)) {
+                                item.click();
+                                Utils.log(`✅ [Blank ${answer.order}] Clicked dropdown item: "${itemText}"`);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Method 4: Button groups or clickable options
+                    if (!found) {
+                        const buttons = container.querySelectorAll('button, .btn, [role="option"], .option, .choice');
+                        for (const btn of buttons) {
+                            const btnText = btn.textContent.trim();
+                            if (btnText === answerText || btnText.includes(answerText)) {
+                                btn.click();
+                                Utils.log(`✅ [Blank ${answer.order}] Clicked button: "${btnText}"`);
+                                found = true;
+                                break;
+                            }
                         }
                     }
 
                     if (!found) {
-                        Utils.log(`⚠️ Could not find element for: "${answer.content.substring(0, 30)}..."`);
+                        Utils.log(`⚠️ [Blank ${answer.order}] Could not find element for: "${answerText}"`);
                     }
                 }
                 // Handle regular text input
@@ -503,9 +639,43 @@
             for (const answer of questionData.answers) {
                 // Try radio buttons
                 const radios = container.querySelectorAll('input[type="radio"]');
-                for (const radio of radios) {
+                const radioArray = Array.from(radios);
+
+                // Method 1: Image-based answer - match by index
+                if (answer.isImage && answer.correctIndex !== undefined) {
+                    const targetRadio = radioArray[answer.correctIndex];
+                    if (targetRadio) {
+                        targetRadio.checked = true;
+                        targetRadio.click();
+                        targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                        Utils.log(`✅ Selected image radio at index ${answer.correctIndex}`);
+                        return;
+                    }
+                }
+
+                // Method 2: Image match by src in rawHtml
+                if (answer.rawHtml && answer.rawHtml.includes('<img')) {
+                    const srcMatch = answer.rawHtml.match(/src=["']([^"']+)["']/);
+                    if (srcMatch) {
+                        const imgSrc = srcMatch[1];
+                        for (const radio of radioArray) {
+                            const label = radio.closest('label') || radio.parentElement;
+                            const img = label?.querySelector('img');
+                            if (img && img.src.includes(imgSrc.split('/').pop())) {
+                                radio.checked = true;
+                                radio.click();
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                Utils.log('✅ Selected radio by image src match');
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // Method 3: Text-based matching (original logic)
+                for (const radio of radioArray) {
                     const label = radio.closest('label') || radio.parentElement;
-                    if (label && label.textContent.includes(answer.content)) {
+                    if (label && answer.content && label.textContent.includes(answer.content)) {
                         radio.checked = true;
                         radio.dispatchEvent(new Event('change', { bubbles: true }));
                         Utils.log(`✅ Selected radio: "${answer.content}"`);
