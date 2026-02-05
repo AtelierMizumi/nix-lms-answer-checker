@@ -441,10 +441,12 @@
                 const $element = isReusable ? $draggable.clone() : $draggable;
 
                 // Trigger jQuery UI events
-                $dropZone.trigger($.Event('drop', {
-                    target: dropZone,
-                    originalEvent: { dataTransfer: { getData: () => content } }
-                }));
+                $dropZone.trigger(
+                    $.Event('drop', {
+                        target: dropZone,
+                        originalEvent: { dataTransfer: { getData: () => content } }
+                    })
+                );
 
                 // Set content in drop zone
                 $element.appendTo($dropZone);
@@ -576,7 +578,11 @@
                         const select = selects[dropdownIndex];
                         for (const option of select.querySelectorAll('option')) {
                             const optionText = option.textContent.trim();
-                            if (optionText === answerText || optionText.includes(answerText) || answerText.includes(optionText)) {
+                            if (
+                                optionText === answerText ||
+                                optionText.includes(answerText) ||
+                                answerText.includes(optionText)
+                            ) {
                                 select.value = option.value;
                                 select.dispatchEvent(new Event('change', { bubbles: true }));
                                 Utils.log(`✅ [Blank ${answer.order}] Selected dropdown: "${optionText}"`);
@@ -608,7 +614,9 @@
 
                     // Method 3: Custom dropdown buttons (Bootstrap/custom UI)
                     if (!found) {
-                        const dropdownItems = container.querySelectorAll('.dropdown-item, .dropdown-menu a, .dropdown-menu button, [data-value]');
+                        const dropdownItems = container.querySelectorAll(
+                            '.dropdown-item, .dropdown-menu a, .dropdown-menu button, [data-value]'
+                        );
                         for (const item of dropdownItems) {
                             const itemText = item.textContent.trim();
                             if (itemText === answerText || itemText.includes(answerText)) {
