@@ -2,6 +2,7 @@
   <img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/platform-Browser-orange?style=for-the-badge" alt="Platform">
+  <a href="https://hits.seeyoufarm.com"><img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FAtelierMizumi%2Fnix-lms-answer-checker&count_bg=%2379C83D&title_bg=%23555555&icon=github.svg&icon_color=%23E7E7E7&title=Views&edge_flat=false" alt="Views"></a>
 </p>
 
 <h1 align="center">🤖 NIX LMS Answer Helper</h1>
