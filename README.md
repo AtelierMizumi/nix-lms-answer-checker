@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/platform-Browser-orange?style=for-the-badge" alt="Platform">
-  <img src="https://komarev.com/ghpvc/?username=AtelierMizumi&label=Visitors&color=E24A68&style=for-the-badge" alt="Visitors">
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=AtelierMizumi.nix-lms-answer-checker" alt="Visitors">
 </p>
 
 <h1 align="center">🤖 NIX LMS Answer Helper</h1>
