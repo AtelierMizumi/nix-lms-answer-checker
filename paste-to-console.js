@@ -16,6 +16,8 @@
     const CONFIG = {
         AUTO_FILL_DELAY: 0,
         AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
+        USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-count',
+        USAGE_COUNT_START: 403,
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions', // Generic container
             // Type 3 - actual DOM selectors from Nix LMS
@@ -30,6 +32,7 @@
         isAutoCompleting: false,
         uiVisible: true,
         autoFillEnabled: false,
+        usageCount: 403,
         lastResponseFingerprint: null,
         progress: { current: 0, total: 0, label: 'Sẵn sàng' }
     };
@@ -90,6 +93,27 @@
             } catch (_e) {
                 /* Storage can be unavailable in restricted browser contexts. */
             }
+        },
+
+        loadUsageCount() {
+            try {
+                const stored = Number.parseInt(window.localStorage.getItem(CONFIG.USAGE_COUNT_STORAGE_KEY), 10);
+                return Number.isFinite(stored) && stored >= CONFIG.USAGE_COUNT_START
+                    ? stored
+                    : CONFIG.USAGE_COUNT_START;
+            } catch (_e) {
+                return CONFIG.USAGE_COUNT_START;
+            }
+        },
+
+        incrementUsageCount() {
+            const nextCount = Utils.loadUsageCount() + 1;
+            try {
+                window.localStorage.setItem(CONFIG.USAGE_COUNT_STORAGE_KEY, String(nextCount));
+            } catch (_e) {
+                /* Storage can be unavailable in restricted browser contexts. */
+            }
+            return nextCount;
         },
 
         /**
@@ -324,6 +348,8 @@
     const Solver = {
         async solve(answers) {
             if (STATE.isAutoCompleting || !answers.length) return;
+            STATE.usageCount = Utils.incrementUsageCount();
+            UI.updateUsageCount();
             Utils.log('🚀 Starting Auto-fill...');
             STATE.isAutoCompleting = true;
             UI.updateProgress(0, answers.length, 'Đang chuẩn bị...');
@@ -949,6 +975,7 @@
 
         init() {
             STATE.autoFillEnabled = Utils.loadAutoFillPreference();
+            STATE.usageCount = Utils.loadUsageCount();
             this.createOverlay();
             this.setupDrag();
         },
@@ -1003,6 +1030,7 @@
                             <span id="nix-toggle-knob" style="position:absolute;width:20px;height:20px;left:${STATE.autoFillEnabled ? '23px' : '3px'};top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:left .2s;"></span>
                         </label>
                     </div>
+                    <small id="nix-usage-count" style="color:#94a3b8;text-align:center;">Lượt sử dụng: ${STATE.usageCount}</small>
                 </div>
             `;
 
@@ -1049,6 +1077,11 @@
             status.textContent = STATE.autoFillEnabled ? 'Đang bật cho kết quả mới' : 'Đang tắt';
             track.style.background = STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1';
             knob.style.left = STATE.autoFillEnabled ? '23px' : '3px';
+        },
+
+        updateUsageCount() {
+            const usage = this.root?.querySelector('#nix-usage-count');
+            if (usage) usage.textContent = `Lượt sử dụng: ${STATE.usageCount}`;
         },
 
         updateProgress(current, total, label) {

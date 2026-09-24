@@ -59,6 +59,11 @@ Trạng thái toggle được lưu trong trình duyệt bằng `localStorage`, n
 của bạn vẫn được giữ sau khi tải lại trang. Khi tắt, script chỉ hiển thị đáp án
 và không tự thay đổi form quiz.
 
+Popup cũng hiển thị bộ đếm lượt sử dụng. Bộ đếm bắt đầu từ `403` và được tăng
+mỗi khi một phiên điền đáp án thực sự bắt đầu, dù được kích hoạt tự động hay
+bằng nút **Điền đáp án ngay**. Đây là bộ đếm cục bộ trên thiết bị của bạn, không
+phải số liệu global trên GitHub và không gửi dữ liệu quiz ra ngoài.
+
 Các loại câu hỏi hiện có logic xử lý gồm Type 3 drag-order, Type 4
 drag-position, Type 5 matching, Type 7 fill-blank và các câu hỏi lựa chọn thông
 thường.
