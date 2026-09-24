@@ -33,11 +33,11 @@ Domain hiện được hỗ trợ bởi userscript:
 
 - `https://digital.nix.edu.vn/*`
 
-### Console paste, dùng để debug hoặc dùng nhanh
+### Console paste, dùng khi cần chạy thủ công
 
 1. Mở đúng trang quiz trước khi có request cần theo dõi.
 2. Mở DevTools bằng `F12` hoặc `Ctrl+Shift+I`, sau đó chọn **Console**.
-3. Copy toàn bộ nội dung [paste-to-console.js](paste-to-console.js).
+3. Sao chép toàn bộ nội dung [paste-to-console.js](paste-to-console.js).
 4. Paste vào Console và nhấn Enter.
 5. Thực hiện lại thao tác check hoặc submit để tạo request.
 
@@ -50,17 +50,19 @@ Nếu request đã hoàn tất trước khi script được nạp, hãy thực h
 Khi bắt được response, popup sẽ hiển thị các câu hỏi và đáp án. Các thao tác
 chính:
 
-- **Auto-Fill**: thử điền đáp án vào form hiện tại.
-- **Copy All**: sao chép đáp án vào clipboard.
+- **Tự động điền đáp án**: bật toggle để tự điền ngay sau mỗi response hợp lệ.
 - Nút thu nhỏ và đóng popup: điều khiển giao diện hiển thị.
+
+Trạng thái toggle được lưu trong trình duyệt bằng `localStorage`, nên lựa chọn
+của bạn vẫn được giữ sau khi tải lại trang. Khi tắt, script chỉ hiển thị đáp án
+và không tự thay đổi form quiz.
 
 Các loại câu hỏi hiện có logic xử lý gồm Type 3 drag-order, Type 4
 drag-position, Type 5 matching, Type 7 fill-blank và các câu hỏi lựa chọn thông
 thường.
 
 Auto-fill phụ thuộc vào selector, event handler và kích thước DOM thực tế của
-NIX LMS. Hãy kiểm tra kết quả trên trang trước khi submit; nếu không điền được,
-dùng đáp án trong popup hoặc **Copy All**.
+NIX LMS. Hãy kiểm tra kết quả trên trang trước khi submit.
 
 ## Khắc phục sự cố
 
@@ -76,14 +78,14 @@ dùng đáp án trong popup hoặc **Copy All**.
 - Đảm bảo script đã được nạp trước thao tác check/submit.
 - Thực hiện lại thao tác để tạo request mới.
 - Trong Network, kiểm tra request có chứa `quiz-submission-check-answer`.
-- Khi dùng console paste, bật `DEBUG` trong `paste-to-console.js` để xem log.
+- Khi dùng console paste, kiểm tra Console để xem log bắt response.
 
 ### Auto-fill không hoạt động
 
 - Đợi trang quiz tải hoàn toàn.
 - Kiểm tra Console có lỗi selector hoặc event không.
 - Một số thao tác kéo thả cần jQuery UI hoặc cấu trúc DOM tương ứng.
-- Dùng đáp án hiển thị trong popup để điền thủ công.
+- Tắt toggle tự động điền và dùng đáp án hiển thị trong popup để điền thủ công.
 
 ## Phát triển
 

@@ -6,7 +6,7 @@
  * 2. Modular design: Network, Parser, Solver, UI, Utils.
  * 3. Strategy Pattern for different question types (Type 3, 4, 5, 7).
  * 4. Safe DOM manipulation and Event simulation.
- * 5. Debug mode with manual JSON paste for testing.
+ * 5. Compact UI with a persisted auto-fill preference.
  */
 
 (function () {
@@ -14,8 +14,8 @@
 
     // --- CONFIGURATION & STATE ---
     const CONFIG = {
-        DEBUG: true,
         AUTO_FILL_DELAY: 500, // ms
+        AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions', // Generic container
             // Type 3 - actual DOM selectors from Nix LMS
@@ -28,13 +28,14 @@
     const STATE = {
         answers: [],
         isAutoCompleting: false,
-        uiVisible: true
+        uiVisible: true,
+        autoFillEnabled: false
     };
 
     // --- MODULE: UTILS ---
     const Utils = {
         log(...args) {
-            if (CONFIG.DEBUG) console.log('🥷 [NIX-Helper]:', ...args);
+            console.log('[NIX Helper]', ...args);
         },
 
         error(...args) {
@@ -73,11 +74,20 @@
             });
         },
 
-        copyToClipboard(text) {
-            if (navigator.clipboard) {
-                return navigator.clipboard.writeText(text);
+        loadAutoFillPreference() {
+            try {
+                return window.localStorage.getItem(CONFIG.AUTO_FILL_STORAGE_KEY) === 'true';
+            } catch (_e) {
+                return false;
             }
-            return Promise.reject('Clipboard API not available');
+        },
+
+        saveAutoFillPreference(enabled) {
+            try {
+                window.localStorage.setItem(CONFIG.AUTO_FILL_STORAGE_KEY, String(enabled));
+            } catch (_e) {
+                /* Storage can be unavailable in restricted browser contexts. */
+            }
         },
 
         /**
@@ -792,6 +802,7 @@
         root: null,
 
         init() {
+            STATE.autoFillEnabled = Utils.loadAutoFillPreference();
             this.createOverlay();
             this.setupDrag();
         },
@@ -802,47 +813,38 @@
             const div = document.createElement('div');
             div.id = 'nix-helper-root';
             div.style.cssText = `
-                position: fixed; top: 20px; right: 20px; width: 450px;
-                background: #fff; border: 2px solid #333; border-radius: 10px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 99999;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                font-size: 13px;
+                position: fixed; top: 20px; right: 20px; width: min(390px, calc(100vw - 32px));
+                background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 14px;
+                box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22); z-index: 99999;
+                font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-size: 13px; color: #1e293b; overflow: hidden;
             `;
 
-            // Debug input area
-            const debugHtml = CONFIG.DEBUG
-                ? `
-                <div style="padding: 8px; border-bottom: 1px dashed #ccc; background: #f0f0f0;">
-                    <button id="nix-btn-debug" style="width:100%;padding:6px;font-size:11px;cursor:pointer;background:#ff9800;color:white;border:none;border-radius:4px;font-weight:bold;">
-                        🐞 Debug Mode: Paste JSON
-                    </button>
-                </div>
-            `
-                : '';
-
             div.innerHTML = `
-                <div id="nix-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 12px; cursor: move; display: flex; justify-content: space-between; align-items: center; border-radius: 10px 10px 0 0;">
-                    <span style="font-weight: bold; font-size: 14px;">🤖 NIX Helper <small style="opacity:0.8">(Stealth)</small></span>
+                <div id="nix-header" style="background: linear-gradient(135deg, #0f766e, #155e75); color: #fff; padding: 15px 16px; cursor: move; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 750; font-size: 15px; letter-spacing: 0.01em;">NIX Helper <small style="display:block;opacity:0.72;font-size:11px;font-weight:500;margin-top:2px;">Đáp án quiz</small></span>
+                    <div style="display:flex;gap:6px;">
+                        <button id="nix-btn-min" aria-label="Thu nhỏ" title="Thu nhỏ" style="width:30px;height:30px;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.25);color:#fff;cursor:pointer;border-radius:7px;font-size:16px;line-height:1;">−</button>
+                        <button id="nix-btn-close" aria-label="Đóng" title="Đóng" style="width:30px;height:30px;background:rgba(15,23,42,0.22);border:1px solid rgba(255,255,255,0.25);color:#fff;cursor:pointer;border-radius:7px;font-size:18px;line-height:1;">×</button>
+                    </div>
+                </div>
+                <div id="nix-content" style="max-height: 430px; overflow-y: auto; padding: 14px; background: #f8fafc;">
+                    <div style="text-align:center; color: #64748b; padding: 34px 20px 30px;">
+                        <div style="font-size:34px;margin-bottom:12px;">◌</div>
+                        <div style="font-weight:700;margin-bottom:6px;color:#334155;">Đang chờ kết quả</div>
+                        <small>Thực hiện Check Answer để nhận đáp án.</small>
+                    </div>
+                </div>
+                <div id="nix-footer" style="padding: 12px 14px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff;">
                     <div>
-                        <button id="nix-btn-min" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:3px;margin-right:5px;">_</button>
-                        <button id="nix-btn-close" style="background:rgba(255,0,0,0.6);border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:3px;">×</button>
+                        <div style="font-weight:700;color:#334155;">Tự động điền đáp án</div>
+                        <small id="nix-setting-status" style="color:#64748b;">${STATE.autoFillEnabled ? 'Đang bật' : 'Đang tắt'}</small>
                     </div>
-                </div>
-                ${debugHtml}
-                <div id="nix-content" style="max-height: 450px; overflow-y: auto; padding: 12px; background: #fafafa;">
-                    <div style="text-align:center; color: #999; padding: 30px 20px;">
-                        <div style="font-size:48px;margin-bottom:10px;">📡</div>
-                        <div style="font-weight:bold;margin-bottom:5px;">Waiting for quiz data...</div>
-                        <small>Start a quiz or use Debug Mode above</small>
-                    </div>
-                </div>
-                <div id="nix-footer" style="padding: 10px; border-top: 2px solid #eee; display: flex; gap: 8px; background: #f5f5f5; border-radius: 0 0 10px 10px;">
-                    <button id="nix-btn-fill" style="flex:1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
-                        🚀 Auto-Fill
-                    </button>
-                    <button id="nix-btn-copy" style="flex:1; padding: 10px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
-                        📋 Copy All
-                    </button>
+                    <label style="position:relative;width:46px;height:26px;display:block;flex:0 0 auto;cursor:pointer;">
+                        <input id="nix-auto-fill-toggle" type="checkbox" ${STATE.autoFillEnabled ? 'checked' : ''} aria-label="Bật tự động điền đáp án" style="opacity:0;width:0;height:0;position:absolute;">
+                        <span style="position:absolute;inset:0;background:${STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1'};border-radius:999px;transition:background .2s;"></span>
+                        <span id="nix-toggle-knob" style="position:absolute;width:20px;height:20px;left:${STATE.autoFillEnabled ? '23px' : '3px'};top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:left .2s;"></span>
+                    </label>
                 </div>
             `;
 
@@ -854,70 +856,33 @@
             div.querySelector('#nix-btn-min').onclick = () => {
                 const content = div.querySelector('#nix-content');
                 const footer = div.querySelector('#nix-footer');
-                const debugBar = div.querySelector('#nix-btn-debug')?.parentElement;
                 const isHidden = content.style.display === 'none';
                 content.style.display = isHidden ? 'block' : 'none';
                 footer.style.display = isHidden ? 'flex' : 'none';
-                if (debugBar) debugBar.style.display = isHidden ? 'block' : 'none';
             };
 
-            div.querySelector('#nix-btn-fill').onclick = () => {
-                if (STATE.answers.length === 0) {
-                    alert('No answers loaded yet!');
-                    return;
+            div.querySelector('#nix-auto-fill-toggle').onchange = event => {
+                STATE.autoFillEnabled = event.target.checked;
+                Utils.saveAutoFillPreference(STATE.autoFillEnabled);
+                this.updateAutoFillToggle();
+                if (!STATE.autoFillEnabled) {
+                    STATE.isAutoCompleting = false;
+                } else if (STATE.answers.length > 0 && !STATE.isAutoCompleting) {
+                    Solver.solve(STATE.answers);
                 }
-                Solver.solve(STATE.answers);
             };
+        },
 
-            div.querySelector('#nix-btn-copy').onclick = () => {
-                const text = STATE.answers
-                    .map(q => {
-                        const answerText = q.answers
-                            .map(a => {
-                                if (q.type === 3) return `${a.content} → pos ${a.targetIndex}`;
-                                if (q.type === 5) return `${a.question} → ${a.answer}`;
-                                return a.content;
-                            })
-                            .join('\n');
-                        return `Q${q.order}: ${q.title}\n${answerText}`;
-                    })
-                    .join('\n\n');
-
-                Utils.copyToClipboard(text).then(() => {
-                    const btn = div.querySelector('#nix-btn-copy');
-                    const orig = btn.textContent;
-                    btn.textContent = '✅ Copied!';
-                    btn.style.background = '#28a745';
-                    setTimeout(() => {
-                        btn.textContent = orig;
-                        btn.style.background = '#007bff';
-                    }, 1500);
-                });
-            };
-
-            // Debug Event
-            if (CONFIG.DEBUG) {
-                div.querySelector('#nix-btn-debug').onclick = () => {
-                    const json = prompt(
-                        '📝 Paste the JSON response from Network tab:\n\n(The entire response from quiz-submission-check-answer endpoint)'
-                    );
-                    if (json) {
-                        try {
-                            const answers = Parser.parse(json);
-                            if (answers.length === 0) {
-                                alert('⚠️ No answers found in JSON. Check the structure.');
-                                return;
-                            }
-                            STATE.answers = answers;
-                            UI.renderAnswers(answers);
-                            Utils.log(`🐞 Debug: Loaded ${answers.length} questions from manual input.`);
-                        } catch (e) {
-                            alert('❌ Invalid JSON format!\n\n' + e.message);
-                            Utils.error('Debug parse failed:', e);
-                        }
-                    }
-                };
-            }
+        updateAutoFillToggle() {
+            const toggle = this.root?.querySelector('#nix-auto-fill-toggle');
+            const status = this.root?.querySelector('#nix-setting-status');
+            const track = toggle?.nextElementSibling;
+            const knob = this.root?.querySelector('#nix-toggle-knob');
+            if (!toggle || !status || !track || !knob) return;
+            toggle.checked = STATE.autoFillEnabled;
+            status.textContent = STATE.autoFillEnabled ? 'Đang bật' : 'Đang tắt';
+            track.style.background = STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1';
+            knob.style.left = STATE.autoFillEnabled ? '23px' : '3px';
         },
 
         renderAnswers(answers) {
@@ -943,23 +908,9 @@
                 )
                 .join('');
 
-            // Bind copy events for combined text
-            content.querySelectorAll('.nix-copy-combined').forEach(btn => {
-                btn.onclick = e => {
-                    const text = e.target.dataset.text;
-                    Utils.copyToClipboard(text).then(() => {
-                        const orig = e.target.textContent;
-                        e.target.textContent = '✅';
-                        setTimeout(() => {
-                            e.target.textContent = orig;
-                        }, 1000);
-                    });
-                };
-            });
-
             // Update header
             this.root.querySelector('#nix-header span').innerHTML =
-                `🤖 NIX Helper <small style="opacity:0.8">(${answers.length} Questions)</small>`;
+                `NIX Helper <small style="display:block;opacity:0.72;font-size:11px;font-weight:500;margin-top:2px;">${answers.length} câu hỏi</small>`;
         },
 
         /**
@@ -996,8 +947,7 @@
         },
 
         /**
-         * Render combined text box with copy button
-         * This allows users to hover with dictionary plugins (like 10ten)
+         * Render a prominent combined answer preview.
          */
         renderCombinedText(questionData) {
             const combined = this.getCombinedText(questionData);
@@ -1008,54 +958,53 @@
 
             return `
                 <div style="background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                    <span class="nix-combined-text" style="flex: 1; font-size: 16px; font-weight: 500; color: #333; user-select: text; cursor: text;" title="Hover để tra từ điển">${combined}</span>
-                    <button class="nix-copy-combined" data-text="${combined.replace(/"/g, '&quot;')}" style="background: ${borderColor}; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; white-space: nowrap;">📋 Copy</button>
+                    <span class="nix-combined-text" style="flex: 1; font-size: 16px; font-weight: 600; color: #1e293b; user-select: text; cursor: text;" title="Bôi đen để tra từ điển">${combined}</span>
                 </div>
             `;
         },
 
         renderAnswerItem(type, ans) {
             if (type === 3) {
-                return `<div style="background:#fff3cd; padding: 6px 8px; border-left: 3px solid #ffc107; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    <span style="color:#856404;">#${ans.targetIndex}</span> → <strong style="user-select:text;">${ans.content}</strong>
-                    ${ans.reusable ? ' <span style="color:#666;">(Reusable)</span>' : ''}
+                return `<div style="background:#fff7ed; padding: 7px 9px; border-left: 3px solid #f59e0b; margin: 5px 0; border-radius: 5px; font-size: 12px;">
+                    <span style="color:#9a3412;font-weight:700;">#${ans.targetIndex}</span> → <strong style="user-select:text;">${ans.content}</strong>
+                    ${ans.reusable ? ' <span style="color:#64748b;">(Reusable)</span>' : ''}
                 </div>`;
             }
             if (type === 4) {
-                return `<div style="background:#d1ecf1; padding: 6px 8px; border-left: 3px solid #17a2b8; margin: 4px 0; border-radius: 3px; font-size: 12px;">
+                return `<div style="background:#ecfeff; padding: 7px 9px; border-left: 3px solid #0891b2; margin: 5px 0; border-radius: 5px; font-size: 12px;">
                     📍 <strong style="user-select:text;">${ans.content}</strong> at (${ans.coordinates.x}, ${ans.coordinates.y})
                 </div>`;
             }
             if (type === 5) {
-                return `<div style="background:#d4edda; padding: 6px 8px; border-left: 3px solid #28a745; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    <span style="color:#666;">${ans.question}</span> → <strong style="user-select:text;">${ans.answer}</strong>
+                return `<div style="background:#ecfdf5; padding: 7px 9px; border-left: 3px solid #059669; margin: 5px 0; border-radius: 5px; font-size: 12px;">
+                    <span style="color:#475569;">${ans.question}</span> → <strong style="user-select:text;">${ans.answer}</strong>
                 </div>`;
             }
             if (type === 7) {
                 // Dropdown choice shows the correct answer prominently
                 if (ans.type === 'dropdown-choice') {
-                    return `<div style="background:#e2d9f3; padding: 8px 10px; border-left: 3px solid #6f42c1; margin: 4px 0; border-radius: 3px; font-size: 13px;">
+                    return `<div style="background:#f0fdfa; padding: 8px 10px; border-left: 3px solid #0f766e; margin: 5px 0; border-radius: 5px; font-size: 13px;">
                         ✅ <strong style="user-select:text;">${ans.content}</strong>
                     </div>`;
                 }
                 // Regular text fill-in
-                return `<div style="background:#e2d9f3; padding: 6px 8px; border-left: 3px solid #6f42c1; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    <span style="color:#666;">[${ans.order}]</span> <strong style="user-select:text;">${ans.content}</strong>
+                return `<div style="background:#f0fdfa; padding: 7px 9px; border-left: 3px solid #0f766e; margin: 5px 0; border-radius: 5px; font-size: 12px;">
+                    <span style="color:#475569;">[${ans.order}]</span> <strong style="user-select:text;">${ans.content}</strong>
                 </div>`;
             }
-            return `<div style="background:#e7f3ff; padding: 6px 8px; border-left: 3px solid #007bff; margin: 4px 0; border-radius: 3px; font-size: 12px;">
+            return `<div style="background:#eff6ff; padding: 7px 9px; border-left: 3px solid #2563eb; margin: 5px 0; border-radius: 5px; font-size: 12px;">
                 ✓ <span style="user-select:text;">${ans.content}</span>
             </div>`;
         },
 
         getTypeColor(type) {
             const colors = {
-                3: '#ffc107',
-                4: '#17a2b8',
-                5: '#28a745',
-                7: '#6f42c1'
+                3: '#f59e0b',
+                4: '#0891b2',
+                5: '#059669',
+                7: '#0f766e'
             };
-            return colors[type] || '#007bff';
+            return colors[type] || '#2563eb';
         },
 
         getTypeIcon(type) {
@@ -1119,6 +1068,9 @@
                     STATE.answers = answers;
                     UI.renderAnswers(answers);
                     Utils.log(`📊 Extracted ${answers.length} questions.`);
+                    if (STATE.autoFillEnabled && !STATE.isAutoCompleting) {
+                        Solver.solve(answers);
+                    }
                 }
             }
         },
@@ -1168,7 +1120,7 @@
         Utils.log('⚠️ Stealth Mode: No global variables exposed.');
         UI.init();
         Network.init();
-        Utils.log('✅ Ready! Open a quiz or use Debug Mode.');
+        Utils.log('✅ Ready! Waiting for quiz answers.');
     }
 
     // Start immediately
