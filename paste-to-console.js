@@ -620,12 +620,19 @@
 
             return options.find(option => {
                 const optionText = option.textContent.trim();
-                return (
-                    optionText === answer.answer ||
-                    optionText.includes(answer.answer) ||
-                    answer.answer.includes(optionText)
-                );
+                return this.matchesAnswerText(optionText, answer.answer);
             });
+        },
+
+        matchesAnswerText(candidate, expected) {
+            const candidateText = candidate.trim();
+            const expectedText = expected.trim();
+            if (!candidateText || !expectedText) return false;
+            return (
+                candidateText === expectedText ||
+                candidateText.includes(expectedText) ||
+                expectedText.includes(candidateText)
+            );
         },
 
         getMatchingRow(select) {
@@ -657,11 +664,7 @@
                     if (select) {
                         for (const option of select.querySelectorAll('option')) {
                             const optionText = option.textContent.trim();
-                            if (
-                                optionText === answerText ||
-                                optionText.includes(answerText) ||
-                                answerText.includes(optionText)
-                            ) {
+                            if (this.matchesAnswerText(optionText, answerText)) {
                                 select.value = option.value;
                                 select.dispatchEvent(new Event('input', { bubbles: true }));
                                 select.dispatchEvent(new Event('change', { bubbles: true }));
