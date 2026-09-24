@@ -301,9 +301,9 @@ export const type5MatchingAnswersResponse = {
             { id: 502, content: '<p>Bird</p>' }
         ],
         matching_answers: [
-            { answer_id: 500, answer_matching: 'A loyal pet' },
-            { answer_id: 501, answer_matching: 'An independent pet' },
-            { answer_id: 502, answer_matching: 'A flying animal' }
+            { id: 600, answer_id: 500, answer_matching: 'A loyal pet' },
+            { id: 601, answer_id: 501, answer_matching: 'An independent pet' },
+            { id: 602, answer_id: 502, answer_matching: 'A flying animal' }
         ]
     },
     expectedAnswers: [

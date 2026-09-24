@@ -242,6 +242,7 @@ describe('Parser', () => {
                 expect(result.answers[i].question).toBe(expected.question);
                 expect(result.answers[i].answer).toBe(expected.answer);
             });
+            expect(result.answers.map(answer => answer.matchingId)).toEqual([600, 601, 602]);
         });
 
         it('should have match type for Type 5 answers', () => {

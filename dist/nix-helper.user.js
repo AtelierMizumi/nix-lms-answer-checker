@@ -251,6 +251,7 @@
                             question: this.cleanHtml(ansObj.content),
                             answer: match.answer_matching,
                             answerId: match.answer_id,
+                            matchingId: match.id,
                             type: 'match'
                         });
                     }
@@ -550,38 +551,71 @@
         async handleType5(container, questionData) {
             Utils.log('🎯 Type 5 - Matching Questions');
 
-            const selects = container.querySelectorAll('select.answer-matching, select');
+            const selects = Array.from(container.querySelectorAll('select.answer-matching, select'));
+            const usedSelects = new Set();
 
             for (const answer of questionData.answers) {
-                // Find the select for this specific question
-                for (const select of selects) {
-                    const parentRow = select.closest('.d-flex, .row, .form-group');
-                    if (!parentRow) continue;
-
-                    const questionText = parentRow.textContent;
-                    if (questionText.includes(answer.question)) {
-                        // Find matching option
-                        const options = select.querySelectorAll('option');
-                        for (const option of options) {
-                            const optionText = option.textContent.trim();
-                            if (optionText === answer.answer || optionText.includes(answer.answer)) {
-                                select.value = option.value;
-
-                                // Trigger events
-                                if (window.$ && $(select).data('select2')) {
-                                    $(select).trigger('change');
-                                } else {
-                                    select.dispatchEvent(new Event('change', { bubbles: true }));
-                                }
-
-                                Utils.log(`✅ Matched: "${answer.question}" → "${answer.answer}"`);
-                                break;
-                            }
-                        }
-                        break;
-                    }
+                const select = this.findMatchingSelect(selects, answer, usedSelects);
+                if (!select) {
+                    Utils.log(`⚠️ Matching row not found for answer ${answer.answerId}`);
+                    continue;
                 }
+
+                const option = this.findMatchingOption(select, answer);
+                if (!option) {
+                    Utils.log(`⚠️ Matching option not found: "${answer.answer}"`);
+                    continue;
+                }
+
+                select.value = option.value;
+                select.dispatchEvent(new Event('input', { bubbles: true }));
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.$ && $(select).data('select2')) {
+                    $(select).trigger('change');
+                }
+                usedSelects.add(select);
+                Utils.log(`✅ Matched: "${answer.question}" → "${answer.answer}"`);
             }
+        },
+
+        findMatchingSelect(selects, answer, usedSelects) {
+            const answerId = String(answer.answerId ?? '');
+            const idMatch = selects.find(
+                select => !usedSelects.has(select) && answerId && this.getControlAnswerIds(select).includes(answerId)
+            );
+            if (idMatch) return idMatch;
+
+            return selects.find(select => {
+                if (usedSelects.has(select)) return false;
+                const row = this.getMatchingRow(select);
+                return row?.textContent?.includes(answer.question);
+            });
+        },
+
+        findMatchingOption(select, answer) {
+            const matchingId = String(answer.matchingId ?? '');
+            const options = Array.from(select.options);
+
+            if (matchingId) {
+                const idMatch = options.find(option => this.getControlAnswerIds(option).includes(matchingId));
+                if (idMatch) return idMatch;
+            }
+
+            return options.find(option => {
+                const optionText = option.textContent.trim();
+                return (
+                    optionText === answer.answer ||
+                    optionText.includes(answer.answer) ||
+                    answer.answer.includes(optionText)
+                );
+            });
+        },
+
+        getMatchingRow(select) {
+            return (
+                select.closest('[data-answer-id], .matching-row, .matching-item, .d-flex, .row, .form-group, tr, li') ||
+                select.parentElement
+            );
         },
 
         // --- TYPE 7: Fill in the Blank / Dropdown Choice ---

@@ -166,6 +166,7 @@ export const Parser = {
                             question: this.cleanHtml(ansObj.content),
                             answer: match.answer_matching,
                             answerId: match.answer_id,
+                            matchingId: match.id,
                             type: 'match'
                         });
                     }
