@@ -14,7 +14,7 @@
 
     // --- CONFIGURATION & STATE ---
     const CONFIG = {
-        AUTO_FILL_DELAY: 500, // ms
+        AUTO_FILL_DELAY: 0,
         AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions', // Generic container
@@ -29,7 +29,9 @@
         answers: [],
         isAutoCompleting: false,
         uiVisible: true,
-        autoFillEnabled: false
+        autoFillEnabled: false,
+        lastResponseFingerprint: null,
+        progress: { current: 0, total: 0, label: 'Sẵn sàng' }
     };
 
     // --- MODULE: UTILS ---
@@ -305,18 +307,28 @@
     // Handles the logic of applying answers to the DOM
     const Solver = {
         async solve(answers) {
+            if (STATE.isAutoCompleting || !answers.length) return;
             Utils.log('🚀 Starting Auto-fill...');
             STATE.isAutoCompleting = true;
+            UI.updateProgress(0, answers.length, 'Đang chuẩn bị...');
 
-            for (const ans of answers) {
+            for (const [index, ans] of answers.entries()) {
                 if (!STATE.isAutoCompleting) break;
+                UI.updateProgress(index, answers.length, `Đang xử lý câu ${index + 1}/${answers.length}`);
                 await this.fillQuestion(ans);
-                // Small delay between questions
-                await new Promise(r => setTimeout(r, CONFIG.AUTO_FILL_DELAY));
+                UI.updateProgress(index + 1, answers.length, `Đã xử lý câu ${index + 1}/${answers.length}`);
+                if (CONFIG.AUTO_FILL_DELAY > 0) {
+                    await new Promise(r => setTimeout(r, CONFIG.AUTO_FILL_DELAY));
+                }
             }
 
             Utils.log('🏁 Auto-fill finished.');
             STATE.isAutoCompleting = false;
+            UI.updateProgress(
+                STATE.progress.current,
+                answers.length,
+                STATE.progress.current === answers.length ? 'Hoàn tất điền đáp án' : 'Đã dừng'
+            );
         },
 
         async fillQuestion(questionData) {
@@ -412,7 +424,9 @@
                     draggableInfo.used = true;
                 }
 
-                await new Promise(r => setTimeout(r, 150));
+                if (CONFIG.AUTO_FILL_DELAY > 0) {
+                    await new Promise(r => setTimeout(r, CONFIG.AUTO_FILL_DELAY));
+                }
             }
         },
 
@@ -888,16 +902,28 @@
                         <small>Thực hiện Check Answer để nhận đáp án.</small>
                     </div>
                 </div>
-                <div id="nix-footer" style="padding: 12px 14px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff;">
-                    <div>
-                        <div style="font-weight:700;color:#334155;">Tự động điền đáp án</div>
-                        <small id="nix-setting-status" style="color:#64748b;">${STATE.autoFillEnabled ? 'Đang bật' : 'Đang tắt'}</small>
+                <div id="nix-progress" style="padding: 10px 14px 0; background: #fff;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:11px;color:#64748b;">
+                        <span id="nix-progress-label">Sẵn sàng</span>
+                        <span id="nix-progress-count">0/0</span>
                     </div>
-                    <label style="position:relative;width:46px;height:26px;display:block;flex:0 0 auto;cursor:pointer;">
-                        <input id="nix-auto-fill-toggle" type="checkbox" ${STATE.autoFillEnabled ? 'checked' : ''} aria-label="Bật tự động điền đáp án" style="opacity:0;width:0;height:0;position:absolute;">
-                        <span style="position:absolute;inset:0;background:${STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1'};border-radius:999px;transition:background .2s;"></span>
-                        <span id="nix-toggle-knob" style="position:absolute;width:20px;height:20px;left:${STATE.autoFillEnabled ? '23px' : '3px'};top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:left .2s;"></span>
-                    </label>
+                    <div style="height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
+                        <div id="nix-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0f766e,#0891b2);border-radius:999px;transition:width .18s ease;"></div>
+                    </div>
+                </div>
+                <div id="nix-footer" style="padding: 12px 14px 14px; border-top: 0; display: flex; flex-direction:column; gap: 10px; background: #fff;">
+                    <button id="nix-btn-fill" style="width:100%;padding:9px 12px;background:#0f766e;color:white;border:0;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">Điền đáp án ngay</button>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                        <div>
+                            <div style="font-weight:700;color:#334155;">Tự động điền đáp án</div>
+                            <small id="nix-setting-status" style="color:#64748b;">${STATE.autoFillEnabled ? 'Đang bật cho kết quả mới' : 'Đang tắt'}</small>
+                        </div>
+                        <label style="position:relative;width:46px;height:26px;display:block;flex:0 0 auto;cursor:pointer;">
+                            <input id="nix-auto-fill-toggle" type="checkbox" ${STATE.autoFillEnabled ? 'checked' : ''} aria-label="Bật tự động điền đáp án mới" style="opacity:0;width:0;height:0;position:absolute;">
+                            <span style="position:absolute;inset:0;background:${STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1'};border-radius:999px;transition:background .2s;"></span>
+                            <span id="nix-toggle-knob" style="position:absolute;width:20px;height:20px;left:${STATE.autoFillEnabled ? '23px' : '3px'};top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:left .2s;"></span>
+                        </label>
+                    </div>
                 </div>
             `;
 
@@ -909,9 +935,19 @@
             div.querySelector('#nix-btn-min').onclick = () => {
                 const content = div.querySelector('#nix-content');
                 const footer = div.querySelector('#nix-footer');
+                const progress = div.querySelector('#nix-progress');
                 const isHidden = content.style.display === 'none';
                 content.style.display = isHidden ? 'block' : 'none';
                 footer.style.display = isHidden ? 'flex' : 'none';
+                progress.style.display = isHidden ? 'block' : 'none';
+            };
+
+            div.querySelector('#nix-btn-fill').onclick = () => {
+                if (!STATE.answers.length) {
+                    this.updateProgress(0, 0, 'Chưa có kết quả để điền');
+                    return;
+                }
+                Solver.solve(STATE.answers);
             };
 
             div.querySelector('#nix-auto-fill-toggle').onchange = event => {
@@ -920,8 +956,6 @@
                 this.updateAutoFillToggle();
                 if (!STATE.autoFillEnabled) {
                     STATE.isAutoCompleting = false;
-                } else if (STATE.answers.length > 0 && !STATE.isAutoCompleting) {
-                    Solver.solve(STATE.answers);
                 }
             };
         },
@@ -933,9 +967,21 @@
             const knob = this.root?.querySelector('#nix-toggle-knob');
             if (!toggle || !status || !track || !knob) return;
             toggle.checked = STATE.autoFillEnabled;
-            status.textContent = STATE.autoFillEnabled ? 'Đang bật' : 'Đang tắt';
+            status.textContent = STATE.autoFillEnabled ? 'Đang bật cho kết quả mới' : 'Đang tắt';
             track.style.background = STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1';
             knob.style.left = STATE.autoFillEnabled ? '23px' : '3px';
+        },
+
+        updateProgress(current, total, label) {
+            STATE.progress = { current, total, label };
+            const progressLabel = this.root?.querySelector('#nix-progress-label');
+            const progressCount = this.root?.querySelector('#nix-progress-count');
+            const progressBar = this.root?.querySelector('#nix-progress-bar');
+            if (!progressLabel || !progressCount || !progressBar) return;
+            const percentage = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
+            progressLabel.textContent = label;
+            progressCount.textContent = `${current}/${total}`;
+            progressBar.style.width = `${percentage}%`;
         },
 
         renderAnswers(answers) {
@@ -960,6 +1006,8 @@
             `
                 )
                 .join('');
+
+            this.updateProgress(0, answers.length, 'Đã nhận kết quả mới');
 
             // Update header
             this.root.querySelector('#nix-header span').innerHTML =
@@ -1118,10 +1166,18 @@
                 Utils.log('🎯 Quiz response intercepted!');
                 const answers = Parser.parse(responseText);
                 if (answers.length > 0) {
+                    const fingerprint = JSON.stringify(answers);
+                    const isNewResponse = fingerprint !== STATE.lastResponseFingerprint;
+                    STATE.lastResponseFingerprint = fingerprint;
                     STATE.answers = answers;
                     UI.renderAnswers(answers);
-                    Utils.log(`📊 Extracted ${answers.length} questions.`);
-                    if (STATE.autoFillEnabled && !STATE.isAutoCompleting) {
+                    UI.updateProgress(
+                        0,
+                        answers.length,
+                        isNewResponse ? 'Đã nhận kết quả mới' : 'Kết quả không thay đổi'
+                    );
+                    Utils.log(`📊 Extracted ${answers.length} questions (${isNewResponse ? 'new' : 'unchanged'}).`);
+                    if (STATE.autoFillEnabled && isNewResponse && !STATE.isAutoCompleting) {
                         Solver.solve(answers);
                     }
                 }

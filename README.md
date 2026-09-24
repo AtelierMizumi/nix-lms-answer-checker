@@ -50,7 +50,9 @@ Nếu request đã hoàn tất trước khi script được nạp, hãy thực h
 Khi bắt được response, popup sẽ hiển thị các câu hỏi và đáp án. Các thao tác
 chính:
 
-- **Tự động điền đáp án**: bật toggle để tự điền ngay sau mỗi response hợp lệ.
+- **Điền đáp án ngay**: chạy thủ công bộ đáp án đang hiển thị.
+- **Tự động điền đáp án**: bật toggle để tự điền một lần khi nhận được kết quả
+  Check Answer mới; response giống lần trước sẽ không chạy lại.
 - Nút thu nhỏ và đóng popup: điều khiển giao diện hiển thị.
 
 Trạng thái toggle được lưu trong trình duyệt bằng `localStorage`, nên lựa chọn
@@ -62,7 +64,8 @@ drag-position, Type 5 matching, Type 7 fill-blank và các câu hỏi lựa ch�
 thường.
 
 Auto-fill phụ thuộc vào selector, event handler và kích thước DOM thực tế của
-NIX LMS. Hãy kiểm tra kết quả trên trang trước khi submit.
+NIX LMS. Thanh tiến trình trong popup hiển thị câu hiện đang xử lý và tổng số
+câu. Hãy kiểm tra kết quả trên trang trước khi submit.
 
 ## Khắc phục sự cố
 
@@ -85,7 +88,7 @@ NIX LMS. Hãy kiểm tra kết quả trên trang trước khi submit.
 - Đợi trang quiz tải hoàn toàn.
 - Kiểm tra Console có lỗi selector hoặc event không.
 - Một số thao tác kéo thả cần jQuery UI hoặc cấu trúc DOM tương ứng.
-- Tắt toggle tự động điền và dùng đáp án hiển thị trong popup để điền thủ công.
+- Dùng **Điền đáp án ngay** để chạy lại thủ công sau khi trang đã sẵn sàng.
 
 ## Phát triển
 
