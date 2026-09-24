@@ -65,6 +65,28 @@ describe('Parser', () => {
                 '見えにくい問題や必要な項目をすべて調べてリストアップすること。'
             );
         });
+
+        it('should prefer the submitted answer value when provided', () => {
+            const question = {
+                id: 12354,
+                type: 7,
+                answers: [
+                    {
+                        id: 42,
+                        content: JSON.stringify({
+                            type: 'single-choice',
+                            correctAnswerIndex: 0,
+                            child_answers: [{ content: 'First' }, { content: 'Second' }]
+                        })
+                    }
+                ]
+            };
+            const wrapper = { answer: JSON.stringify({ type: 7, data: { 42: 'Second' } }) };
+            const result = Parser.processQuestion(question, wrapper);
+
+            expect(result.answers[0].content).toBe('Second');
+            expect(result.answers[0].answerId).toBe(42);
+        });
     });
 
     describe('processQuestion - Type 7 Text Input', () => {

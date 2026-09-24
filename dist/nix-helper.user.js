@@ -159,7 +159,7 @@
         processQuestion(q, qWrapper, index) {
             const result = {
                 id: q.id,
-                order: index + 1,
+                order: Number.isInteger(qWrapper?.order) ? qWrapper.order + 1 : index + 1,
                 title: this.cleanHtml(q.title || ''),
                 content: this.cleanHtml(q.content || ''),
                 type: q.type,
@@ -259,19 +259,34 @@
             }
             // STRATEGY: TYPE 7 (Fill in blank / Short Answer / Single Choice Dropdown)
             else if (q.type === 7 && q.answers) {
+                let submittedAnswers = {};
+                try {
+                    submittedAnswers = JSON.parse(qWrapper?.answer || '{}').data || {};
+                } catch (_e) {
+                    /* The submission answer is optional. */
+                }
+
                 q.answers.forEach((ans, idx) => {
                     try {
                         const contentObj = JSON.parse(ans.content);
 
                         // Handle single-choice dropdown/radio type
                         if (contentObj.type === 'single-choice' && contentObj.child_answers) {
-                            const correctIdx = contentObj.correctAnswerIndex;
+                            const submittedContent = submittedAnswers[String(ans.id)];
+                            const submittedIndex = contentObj.child_answers.findIndex(
+                                child => child.content === submittedContent
+                            );
+                            const correctIdx =
+                                typeof submittedContent === 'string' && submittedIndex >= 0
+                                    ? submittedIndex
+                                    : contentObj.correctAnswerIndex;
                             if (correctIdx !== undefined && contentObj.child_answers[correctIdx]) {
                                 result.answers.push({
                                     content: contentObj.child_answers[correctIdx].content,
                                     allOptions: contentObj.child_answers.map(c => c.content),
                                     correctIndex: correctIdx,
                                     order: idx + 1,
+                                    answerId: ans.id,
                                     type: 'dropdown-choice'
                                 });
                             }
@@ -354,10 +369,30 @@
             // Try multiple selector strategies to find the question container
             let container = null;
 
-            // Strategy 1: Data attribute
-            container = await Utils.waitForElement(`[data-id="${questionData.id}"]`, document, 2000);
+            // Strategy 1: Question ID attributes used by different LMS renderers
+            const questionSelectors = [
+                `[data-id="${questionData.id}"]`,
+                `[data-question-id="${questionData.id}"]`,
+                `[data-question="${questionData.id}"]`,
+                `[data-id-question="${questionData.id}"]`
+            ];
+            for (const selector of questionSelectors) {
+                container = await Utils.waitForElement(selector, document, 500);
+                if (container) break;
+            }
 
-            // Strategy 2: Find by order
+            // Strategy 2: Find a container holding one of this question's answer IDs
+            if (!container && questionData.answers.some(answer => answer.answerId)) {
+                const answerIds = new Set(questionData.answers.map(answer => String(answer.answerId)));
+                const possibleContainers = document.querySelectorAll(CONFIG.SELECTORS.QUESTION_CONTAINER);
+                container = Array.from(possibleContainers).find(candidate =>
+                    Array.from(
+                        candidate.querySelectorAll('input, select, option, [data-answer-id], [data-answer]')
+                    ).some(element => [...this.getControlAnswerIds(element)].some(id => answerIds.has(id)))
+                );
+            }
+
+            // Strategy 3: Find by local question order
             if (!container) {
                 const allQuestions = document.querySelectorAll(CONFIG.SELECTORS.QUESTION_CONTAINER);
                 container = allQuestions[questionData.order - 1];
@@ -632,9 +667,12 @@
                     let found = false;
 
                     // Method 1: Standard <select> dropdowns
-                    const selects = container.querySelectorAll('select');
-                    if (selects[dropdownIndex]) {
-                        const select = selects[dropdownIndex];
+                    const selects = Array.from(container.querySelectorAll('select'));
+                    const idSelect = selects.find(
+                        select => answer.answerId && this.getControlAnswerIds(select).includes(String(answer.answerId))
+                    );
+                    const select = idSelect || selects[dropdownIndex];
+                    if (select) {
                         for (const option of select.querySelectorAll('option')) {
                             const optionText = option.textContent.trim();
                             if (
@@ -643,7 +681,11 @@
                                 answerText.includes(optionText)
                             ) {
                                 select.value = option.value;
+                                select.dispatchEvent(new Event('input', { bubbles: true }));
                                 select.dispatchEvent(new Event('change', { bubbles: true }));
+                                if (window.$ && $(select).data('select2')) {
+                                    $(select).trigger('change');
+                                }
                                 Utils.log(`✅ [Blank ${answer.order}] Selected dropdown: "${optionText}"`);
                                 found = true;
                                 break;
