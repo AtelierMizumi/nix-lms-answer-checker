@@ -236,6 +236,7 @@ export const imageAnswerResponse = {
     question: {
         id: 12352,
         type: 1,
+        shuffle_answers: 1,
         order: 3,
         title: 'Chọn hình đúng:',
         answers: [

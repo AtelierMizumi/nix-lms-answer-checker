@@ -53,6 +53,7 @@ export const Parser = {
             order: q.order || index + 1,
             title: this.cleanHtml(q.title),
             content: this.cleanHtml(q.content || ''),
+            shuffled: q.shuffle_answers === 1,
             answers: []
         };
 

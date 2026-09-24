@@ -143,6 +143,7 @@
                 title: this.cleanHtml(q.title || ''),
                 content: this.cleanHtml(q.content || ''),
                 type: q.type,
+                shuffled: q.shuffle_answers === 1,
                 answers: [] // Format: { content: "...", index: 1, ...metadata }
             };
 
@@ -654,70 +655,26 @@
         async handleStandard(container, questionData) {
             Utils.log('🎯 Standard Question Type');
 
+            const controls = Array.from(container.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
+            const radios = controls.filter(control => control.type === 'radio');
+            const checkboxes = controls.filter(control => control.type === 'checkbox');
+
             for (const answer of questionData.answers) {
-                // Try radio buttons
-                const radios = container.querySelectorAll('input[type="radio"]');
-                const radioArray = Array.from(radios);
+                const target = this.findStandardAnswer(controls, answer, questionData);
 
-                // Method 1: Image-based answer - match by index
-                if (answer.isImage && answer.correctIndex !== undefined) {
-                    const targetRadio = radioArray[answer.correctIndex];
-                    if (targetRadio) {
-                        targetRadio.checked = true;
-                        targetRadio.click();
-                        targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
-                        Utils.log(`✅ Selected image radio at index ${answer.correctIndex}`);
-                        return;
-                    }
+                if (target) {
+                    this.activateAnswerControl(target);
+                    Utils.log(`✅ Selected answer ${answer.answerId ?? '(matched by content)'}`);
+                    continue;
                 }
 
-                // Method 2: Image match by src in rawHtml
-                if (answer.rawHtml && answer.rawHtml.includes('<img')) {
-                    const srcMatch = answer.rawHtml.match(/src=["']([^"']+)["']/);
-                    if (srcMatch) {
-                        const imgSrc = srcMatch[1];
-                        for (const radio of radioArray) {
-                            const label = radio.closest('label') || radio.parentElement;
-                            const img = label?.querySelector('img');
-                            if (img && img.src.includes(imgSrc.split('/').pop())) {
-                                radio.checked = true;
-                                radio.click();
-                                radio.dispatchEvent(new Event('change', { bubbles: true }));
-                                Utils.log('✅ Selected radio by image src match');
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                // Method 3: Text-based matching (original logic)
-                for (const radio of radioArray) {
-                    const label = radio.closest('label') || radio.parentElement;
-                    if (label && answer.content && label.textContent.includes(answer.content)) {
-                        radio.checked = true;
-                        radio.dispatchEvent(new Event('change', { bubbles: true }));
-                        Utils.log(`✅ Selected radio: "${answer.content}"`);
-                        return;
-                    }
-                }
-
-                // Try checkboxes
-                const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-                for (const checkbox of checkboxes) {
-                    const label = checkbox.closest('label') || checkbox.parentElement;
-                    if (label && label.textContent.includes(answer.content)) {
-                        checkbox.checked = true;
-                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                        Utils.log(`✅ Checked: "${answer.content}"`);
-                    }
-                }
-
-                // Try dropdowns
-                const selects = container.querySelectorAll('select');
-                for (const select of selects) {
-                    const options = select.querySelectorAll('option');
-                    for (const option of options) {
-                        if (option.textContent.trim() === answer.content) {
+                if (answer.content) {
+                    const selects = container.querySelectorAll('select');
+                    for (const select of selects) {
+                        const option = Array.from(select.options).find(
+                            item => item.textContent.trim() === answer.content
+                        );
+                        if (option) {
                             select.value = option.value;
                             select.dispatchEvent(new Event('change', { bubbles: true }));
                             Utils.log(`✅ Selected dropdown: "${answer.content}"`);
@@ -726,6 +683,102 @@
                     }
                 }
             }
+
+            Utils.log(`ℹ️ Standard controls: ${radios.length} radio, ${checkboxes.length} checkbox`);
+        },
+
+        findStandardAnswer(controls, answer, questionData) {
+            const answerId = String(answer.answerId ?? '');
+            const imageSrc = this.getAnswerImageSrc(answer.rawHtml);
+
+            if (answerId) {
+                const idMatch = controls.find(control => this.getControlAnswerIds(control).includes(answerId));
+                if (idMatch) return idMatch;
+            }
+
+            if (imageSrc) {
+                const imageMatch = controls.find(control => {
+                    const image = this.getControlContainer(control)?.querySelector('img');
+                    return image && this.sameImage(image.src, imageSrc);
+                });
+                if (imageMatch) return imageMatch;
+            }
+
+            if (answer.content) {
+                const textMatch = controls.find(control => {
+                    const option = this.getControlContainer(control);
+                    return option?.textContent?.includes(answer.content);
+                });
+                if (textMatch) return textMatch;
+            }
+
+            if (!questionData.shuffled && answer.correctIndex !== undefined) {
+                return controls[answer.correctIndex] || null;
+            }
+
+            Utils.log(`⚠️ Could not match answer ${answer.answerId ?? '(no ID)'}`);
+            return null;
+        },
+
+        getControlContainer(control) {
+            return (
+                control.closest(
+                    'label, [data-answer-id], [data-answer], [data-option-id], .answer-option, .form-check, li, .choice, .option'
+                ) || control.parentElement
+            );
+        },
+
+        getControlAnswerIds(control) {
+            const ids = [];
+            let current = control;
+            let depth = 0;
+            while (current && depth < 4) {
+                ['value', 'id', 'data-id', 'data-answer-id', 'data-answer', 'data-option-id', 'data-value'].forEach(
+                    attribute => {
+                        const value = current.getAttribute?.(attribute);
+                        if (value == null) return;
+                        const normalized = value.trim();
+                        if (/^\d+$/.test(normalized)) {
+                            ids.push(normalized);
+                        } else {
+                            const suffix = normalized.match(/(?:^|[_:-])(\d+)$/);
+                            if (suffix) ids.push(suffix[1]);
+                        }
+                    }
+                );
+                current = current.parentElement;
+                depth++;
+            }
+            return [...new Set(ids)];
+        },
+
+        getAnswerImageSrc(rawHtml) {
+            if (!rawHtml || !rawHtml.includes('<img')) return null;
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = rawHtml;
+            return wrapper.querySelector('img')?.src || null;
+        },
+
+        sameImage(firstSrc, secondSrc) {
+            try {
+                const first = new window.URL(firstSrc, window.location.href);
+                const second = new window.URL(secondSrc, window.location.href);
+                return first.href === second.href || first.pathname === second.pathname;
+            } catch (_e) {
+                return firstSrc === secondSrc;
+            }
+        },
+
+        activateAnswerControl(control) {
+            if (control.type === 'radio' && control.checked) return;
+            if (control.type === 'checkbox' && control.checked) return;
+
+            control.click();
+            if (!control.checked) {
+                this.getControlContainer(control)?.click();
+            }
+            control.dispatchEvent(new Event('input', { bubbles: true }));
+            control.dispatchEvent(new Event('change', { bubbles: true }));
         },
 
         /**

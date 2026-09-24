@@ -203,6 +203,7 @@ describe('Parser', () => {
             expect(result.answers).toHaveLength(1);
             expect(result.answers[0].isImage).toBe(expectedAnswer.isImage);
             expect(result.answers[0].correctIndex).toBe(expectedAnswer.correctIndex);
+            expect(result.shuffled).toBe(true);
         });
 
         it('should preserve rawHtml for image matching', () => {
