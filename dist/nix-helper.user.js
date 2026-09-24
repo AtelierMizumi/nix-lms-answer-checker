@@ -4,10 +4,7 @@
 // @version      2.2.0
 // @description  Extract and display answers from NIX Digital LMS quizzes
 // @author       AtelierMizumi
-// @match        *://*.nixedu.vn/*
-// @match        *://lms.nix.edu.vn/*
-// @match        *://nixdigital.vn/*
-// @match        *://*.nixdigital.vn/*
+// @match        *://digital.nix.edu.vn/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=nix.edu.vn
 // @grant        GM_setClipboard
 // @grant        GM_notification

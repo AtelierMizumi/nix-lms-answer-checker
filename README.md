@@ -15,21 +15,23 @@
 
 ### Tampermonkey, khuyến nghị
 
-Tampermonkey là cách cài chính. Script sẽ tự nạp khi mở một domain khớp cấu hình
-và có thể tự cập nhật từ GitHub.
+Tampermonkey là cách cài chính. Script sẽ tự nạp khi mở
+`https://digital.nix.edu.vn` và có thể tự cập nhật từ GitHub.
 
 1. Cài [Tampermonkey](https://www.tampermonkey.net/).
-2. Mở
-   [file userscript mới nhất](https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js).
-3. Chọn **Install** hoặc **Install this script** trong Tampermonkey.
-4. Mở hoặc tải lại trang quiz NIX LMS.
+2. Mở trình quản lý Tampermonkey bằng cách bấm biểu tượng extension, sau đó chọn
+   **Dashboard**.
+3. Mở tab **Utilities**.
+4. Tại mục **Install from URL**, dán URL sau:
 
-Các domain hiện được hỗ trợ bởi userscript:
+`https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js`
 
-- `*.nixedu.vn`
-- `lms.nix.edu.vn`
-- `nixdigital.vn`
-- `*.nixdigital.vn`
+5. Bấm **Install** trong màn hình xác nhận của Tampermonkey.
+6. Quay lại `https://digital.nix.edu.vn` và tải lại trang quiz.
+
+Domain hiện được hỗ trợ bởi userscript:
+
+- `https://digital.nix.edu.vn/*`
 
 ### Console paste, dùng để debug hoặc dùng nhanh
 
@@ -65,7 +67,7 @@ dùng đáp án trong popup hoặc **Copy All**.
 ### Tampermonkey không chạy
 
 - Kiểm tra extension và userscript đang được bật.
-- Kiểm tra trang hiện tại có khớp một trong các domain ở trên không.
+- Kiểm tra trang hiện tại là `https://digital.nix.edu.vn`.
 - Tải lại trang sau khi cài hoặc cập nhật script.
 - Mở Console để kiểm tra lỗi JavaScript.
 
