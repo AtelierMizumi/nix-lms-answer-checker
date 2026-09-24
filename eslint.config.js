@@ -28,7 +28,7 @@ export default [
     },
     // Config for userscripts (IIFE pattern)
     {
-        files: ['src/nix-helper.user.js', 'paste-to-console.js'],
+        files: ['paste-to-console.js'],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType: 'script',
@@ -78,6 +78,16 @@ export default [
             'no-multiple-empty-lines': ['warn', { max: 2 }],
             'no-var': 'warn',
             'prefer-const': 'warn'
+        }
+    },
+    {
+        files: ['scripts/**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+            globals: {
+                console: 'readonly'
+            }
         }
     },
     {

@@ -14,15 +14,14 @@ description: How to build the project for distribution
 // turbo
 
 ```bash
-# Currently the project is a single-file userscript
-# Just copy src/nix-helper.user.js to use
+npm run build
 ```
 
 ## Available Versions
 
 ### 1. Tampermonkey Userscript (Recommended)
 
-**File**: `src/nix-helper.user.js`
+**File**: `dist/nix-helper.user.js`
 
 Auto-loads when visiting NIX LMS websites. Install via Tampermonkey.
 
@@ -32,12 +31,5 @@ Auto-loads when visiting NIX LMS websites. Install via Tampermonkey.
 
 Copy and paste into browser console (F12).
 
-## Future: Bundled Build
-
-When modules are separated, use:
-
-```bash
-npm run build
-```
-
-This will bundle all modules into `dist/paste-to-console.js`.
+The build copies the canonical runtime into a userscript artifact with
+Tampermonkey metadata, including update and download URLs.

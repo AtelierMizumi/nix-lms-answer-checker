@@ -10,7 +10,8 @@ description: How to test the script with sample data
 
 1. Install Tampermonkey extension
 2. Create new userscript
-3. Copy content from `src/nix-helper.user.js`
+3. Install `dist/nix-helper.user.js` from the raw GitHub URL, or run
+   `npm run build` first
 4. Visit NIX LMS website
 5. Start a quiz - script should auto-capture answers
 

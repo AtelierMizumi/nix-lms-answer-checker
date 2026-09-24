@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         NIX Digital LMS Answer Helper
 // @namespace    https://github.com/AtelierMizumi/nix-lms-answer-checker
-// @version      2.1.0
-// @description  Automatically extracts and displays answers from NIX Digital LMS quizzes with auto-fill support
+// @version      2.2.0
+// @description  Extract and display answers from NIX Digital LMS quizzes
 // @author       AtelierMizumi
 // @match        *://*.nixedu.vn/*
 // @match        *://lms.nix.edu.vn/*
@@ -15,12 +15,12 @@
 // @license      MIT
 // @homepage     https://github.com/AtelierMizumi/nix-lms-answer-checker
 // @supportURL   https://github.com/AtelierMizumi/nix-lms-answer-checker/issues
-// @updateURL    https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/src/nix-helper.user.js
-// @downloadURL  https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/src/nix-helper.user.js
+// @updateURL    https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js
+// @downloadURL  https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js
 // ==/UserScript==
 
 /**
- * NIX Digital LMS Answer Extractor - Tampermonkey Edition
+ * NIX Digital LMS Answer Extractor - Stealth & Modular Version
  *
  * ARCHITECTURE NOTES:
  * 1. Fully encapsulated in IIFE to prevent global scope pollution (Anti-cheat evasion).
@@ -35,10 +35,10 @@
 
     // --- CONFIGURATION & STATE ---
     const CONFIG = {
-        DEBUG: false, // Set to true for development
+        DEBUG: true,
         AUTO_FILL_DELAY: 500, // ms
         SELECTORS: {
-            QUESTION_CONTAINER: '.question-container, .questions',
+            QUESTION_CONTAINER: '.question-container, .questions', // Generic container
             // Type 3 - actual DOM selectors from Nix LMS
             TYPE_3_DROP_ZONE: '.droppable-zone-question',
             TYPE_3_DRAGGABLE: '.answer-text.ui-draggable',
@@ -95,24 +95,10 @@
         },
 
         copyToClipboard(text) {
-            // Use Tampermonkey's GM_setClipboard if available
-            if (typeof GM_setClipboard !== 'undefined') {
-                GM_setClipboard(text);
-                return Promise.resolve();
-            }
             if (navigator.clipboard) {
                 return navigator.clipboard.writeText(text);
             }
             return Promise.reject('Clipboard API not available');
-        },
-
-        /**
-         * Show notification using Tampermonkey API
-         */
-        notify(title, text) {
-            if (typeof GM_notification !== 'undefined') {
-                GM_notification({ title, text, timeout: 3000 });
-            }
         },
 
         /**
@@ -129,18 +115,21 @@
                 element.value = value;
             }
 
+            // Trigger all relevant events
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
         }
     };
 
     // --- MODULE: PARSER ---
+    // Handles extraction of answers from raw JSON
     const Parser = {
         parse(jsonString) {
             try {
                 const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
                 const extracted = [];
 
+                // Support new structure with "questions" array
                 if (data.questions && Array.isArray(data.questions)) {
                     data.questions.forEach((q, index) => {
                         const questionData = q.question;
@@ -165,10 +154,11 @@
                 title: this.cleanHtml(q.title || ''),
                 content: this.cleanHtml(q.content || ''),
                 type: q.type,
-                answers: []
+                answers: [] // Format: { content: "...", index: 1, ...metadata }
             };
 
             // STRATEGY: TYPE 3 (Drag & Drop Text / Reordering)
+            // Based on user log: answers have `draggable_answer.correct_index`
             if (q.type === 3) {
                 if (q.answers && Array.isArray(q.answers)) {
                     // Step 1: Build a map of correct_index -> answer content
@@ -322,6 +312,7 @@
     };
 
     // --- MODULE: SOLVER ---
+    // Handles the logic of applying answers to the DOM
     const Solver = {
         async solve(answers) {
             Utils.log('🚀 Starting Auto-fill...');
@@ -330,19 +321,22 @@
             for (const ans of answers) {
                 if (!STATE.isAutoCompleting) break;
                 await this.fillQuestion(ans);
+                // Small delay between questions
                 await new Promise(r => setTimeout(r, CONFIG.AUTO_FILL_DELAY));
             }
 
             Utils.log('🏁 Auto-fill finished.');
-            Utils.notify('NIX Helper', 'Auto-fill completed!');
             STATE.isAutoCompleting = false;
         },
 
         async fillQuestion(questionData) {
+            // Try multiple selector strategies to find the question container
             let container = null;
 
+            // Strategy 1: Data attribute
             container = await Utils.waitForElement(`[data-id="${questionData.id}"]`, document, 2000);
 
+            // Strategy 2: Find by order
             if (!container) {
                 const allQuestions = document.querySelectorAll(CONFIG.SELECTORS.QUESTION_CONTAINER);
                 container = allQuestions[questionData.order - 1];
@@ -372,6 +366,7 @@
             }
         },
 
+        // --- TYPE 3: Drag & Drop with Index ---
         async handleType3(container, questionData) {
             Utils.log('🎯 Type 3 - Drag & Drop with Index');
 
@@ -488,6 +483,7 @@
             dropZone.dispatchEvent(new Event('drop', { bubbles: true, detail: { content } }));
         },
 
+        // --- TYPE 4: Drag & Drop with Coordinates ---
         async handleType4(container, questionData) {
             Utils.log('🎯 Type 4 - Drag & Drop with Coordinates');
 
@@ -513,11 +509,13 @@
                     continue;
                 }
 
+                // Set absolute position
                 foundDraggable.style.position = 'absolute';
                 foundDraggable.style.left = answer.coordinates.x + 'px';
                 foundDraggable.style.top = answer.coordinates.y + 'px';
                 foundDraggable.style.zIndex = '1000';
 
+                // Trigger drag events if jQuery UI is available
                 if (window.$ && $(foundDraggable).hasClass('ui-draggable')) {
                     $(foundDraggable).trigger('dragstop');
                 }
@@ -526,24 +524,28 @@
             }
         },
 
+        // --- TYPE 5: Matching Questions ---
         async handleType5(container, questionData) {
             Utils.log('🎯 Type 5 - Matching Questions');
 
             const selects = container.querySelectorAll('select.answer-matching, select');
 
             for (const answer of questionData.answers) {
+                // Find the select for this specific question
                 for (const select of selects) {
                     const parentRow = select.closest('.d-flex, .row, .form-group');
                     if (!parentRow) continue;
 
                     const questionText = parentRow.textContent;
                     if (questionText.includes(answer.question)) {
+                        // Find matching option
                         const options = select.querySelectorAll('option');
                         for (const option of options) {
                             const optionText = option.textContent.trim();
                             if (optionText === answer.answer || optionText.includes(answer.answer)) {
                                 select.value = option.value;
 
+                                // Trigger events
                                 if (window.$ && $(select).data('select2')) {
                                     $(select).trigger('change');
                                 } else {
@@ -560,6 +562,7 @@
             }
         },
 
+        // --- TYPE 7: Fill in the Blank / Dropdown Choice ---
         async handleType7(container, questionData) {
             Utils.log('🎯 Type 7 - Fill in the Blank / Dropdown Choice');
 
@@ -658,10 +661,12 @@
             }
         },
 
+        // --- STANDARD: Radio, Checkbox, Text ---
         async handleStandard(container, questionData) {
             Utils.log('🎯 Standard Question Type');
 
             for (const answer of questionData.answers) {
+                // Try radio buttons
                 const radios = container.querySelectorAll('input[type="radio"]');
                 const radioArray = Array.from(radios);
 
@@ -707,6 +712,7 @@
                     }
                 }
 
+                // Try checkboxes
                 const checkboxes = container.querySelectorAll('input[type="checkbox"]');
                 for (const checkbox of checkboxes) {
                     const label = checkbox.closest('label') || checkbox.parentElement;
@@ -717,6 +723,7 @@
                     }
                 }
 
+                // Try dropdowns
                 const selects = container.querySelectorAll('select');
                 for (const select of selects) {
                     const options = select.querySelectorAll('option');
@@ -732,10 +739,15 @@
             }
         },
 
+        /**
+         * Simulate drag and drop operation
+         */
         async simulateDragDrop(sourceElement, targetElement) {
+            // Get positions
             const sourceRect = sourceElement.getBoundingClientRect();
             const targetRect = targetElement.getBoundingClientRect();
 
+            // Create and dispatch events
             const events = [
                 new MouseEvent('mousedown', {
                     bubbles: true,
@@ -775,14 +787,20 @@
                 })
             ];
 
-            sourceElement.dispatchEvent(events[0]);
-            sourceElement.dispatchEvent(events[1]);
-            targetElement.dispatchEvent(events[2]);
-            targetElement.dispatchEvent(events[3]);
-            targetElement.dispatchEvent(events[4]);
-            sourceElement.dispatchEvent(events[5]);
-            sourceElement.dispatchEvent(events[6]);
+            // Dispatch on source
+            sourceElement.dispatchEvent(events[0]); // mousedown
+            sourceElement.dispatchEvent(events[1]); // dragstart
 
+            // Dispatch on target
+            targetElement.dispatchEvent(events[2]); // dragenter
+            targetElement.dispatchEvent(events[3]); // dragover
+            targetElement.dispatchEvent(events[4]); // drop
+
+            // Finish on source
+            sourceElement.dispatchEvent(events[5]); // dragend
+            sourceElement.dispatchEvent(events[6]); // mouseup
+
+            // If jQuery UI is available, trigger its events
             if (window.$ && window.$.ui) {
                 $(sourceElement).trigger('dragstop');
                 $(targetElement).trigger('drop');
@@ -812,6 +830,7 @@
                 font-size: 13px;
             `;
 
+            // Debug input area
             const debugHtml = CONFIG.DEBUG
                 ? `
                 <div style="padding: 8px; border-bottom: 1px dashed #ccc; background: #f0f0f0;">
@@ -824,7 +843,7 @@
 
             div.innerHTML = `
                 <div id="nix-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 12px; cursor: move; display: flex; justify-content: space-between; align-items: center; border-radius: 10px 10px 0 0;">
-                    <span style="font-weight: bold; font-size: 14px;">🤖 NIX Helper <small style="opacity:0.8">(Tampermonkey)</small></span>
+                    <span style="font-weight: bold; font-size: 14px;">🤖 NIX Helper <small style="opacity:0.8">(Stealth)</small></span>
                     <div>
                         <button id="nix-btn-min" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:3px;margin-right:5px;">_</button>
                         <button id="nix-btn-close" style="background:rgba(255,0,0,0.6);border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:3px;">×</button>
@@ -835,7 +854,7 @@
                     <div style="text-align:center; color: #999; padding: 30px 20px;">
                         <div style="font-size:48px;margin-bottom:10px;">📡</div>
                         <div style="font-weight:bold;margin-bottom:5px;">Waiting for quiz data...</div>
-                        <small>Start a quiz - answers will be captured automatically</small>
+                        <small>Start a quiz or use Debug Mode above</small>
                     </div>
                 </div>
                 <div id="nix-footer" style="padding: 10px; border-top: 2px solid #eee; display: flex; gap: 8px; background: #f5f5f5; border-radius: 0 0 10px 10px;">
@@ -959,6 +978,7 @@
                 };
             });
 
+            // Update header
             this.root.querySelector('#nix-header span').innerHTML =
                 `🤖 NIX Helper <small style="opacity:0.8">(${answers.length} Questions)</small>`;
         },
@@ -1109,7 +1129,7 @@
         init() {
             this.hookXHR();
             this.hookFetch();
-            Utils.log('✅ Network interceptors initialized (Tampermonkey mode).');
+            Utils.log('✅ Network interceptors initialized (stealth mode).');
         },
 
         processResponse(url, responseText) {
@@ -1120,7 +1140,6 @@
                     STATE.answers = answers;
                     UI.renderAnswers(answers);
                     Utils.log(`📊 Extracted ${answers.length} questions.`);
-                    Utils.notify('NIX Helper', `Loaded ${answers.length} questions!`);
                 }
             }
         },
@@ -1166,16 +1185,13 @@
 
     // --- BOOTSTRAP ---
     function start() {
-        console.log('🥷 NIX Helper v2.0.0 (Tampermonkey) loaded!');
+        Utils.log('🚀 NIX Helper initializing...');
+        Utils.log('⚠️ Stealth Mode: No global variables exposed.');
         UI.init();
         Network.init();
-        Utils.notify('NIX Helper', 'Script loaded! Ready to capture quiz answers.');
+        Utils.log('✅ Ready! Open a quiz or use Debug Mode.');
     }
 
-    // Wait for page to be ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start);
-    } else {
-        start();
-    }
+    // Start immediately
+    start();
 })();
