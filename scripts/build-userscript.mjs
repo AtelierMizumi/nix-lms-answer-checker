@@ -8,7 +8,7 @@ const outputPath = resolve(root, 'dist/nix-helper.user.js');
 const metadata = `// ==UserScript==
 // @name         NIX Digital LMS Answer Helper
 // @namespace    https://github.com/AtelierMizumi/nix-lms-answer-checker
-// @version      2.2.0
+// @version      2.3.0
 // @description  Extract and display answers from NIX Digital LMS quizzes
 // @author       AtelierMizumi
 // @match        *://digital.nix.edu.vn/*

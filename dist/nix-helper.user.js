@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NIX Digital LMS Answer Helper
 // @namespace    https://github.com/AtelierMizumi/nix-lms-answer-checker
-// @version      2.2.0
+// @version      2.3.0
 // @description  Extract and display answers from NIX Digital LMS quizzes
 // @author       AtelierMizumi
 // @match        *://digital.nix.edu.vn/*
@@ -36,6 +36,7 @@
         AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
         USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-count',
         USAGE_COUNT_START: 403,
+        USAGE_ANALYTICS_URL: 'https://api.counterapi.dev/v1/nix-lms-answer-checker/autofill/up',
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions', // Generic container
             // Type 3 - actual DOM selectors from Nix LMS
@@ -132,6 +133,19 @@
                 /* Storage can be unavailable in restricted browser contexts. */
             }
             return nextCount;
+        },
+
+        trackUsage() {
+            window
+                .fetch(CONFIG.USAGE_ANALYTICS_URL, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    keepalive: true
+                })
+                .catch(() => {
+                    // Analytics failure must never interrupt answer filling.
+                });
         },
 
         /**
@@ -368,6 +382,7 @@
             if (STATE.isAutoCompleting || !answers.length) return;
             STATE.usageCount = Utils.incrementUsageCount();
             UI.updateUsageCount();
+            Utils.trackUsage();
             Utils.log('🚀 Starting Auto-fill...');
             STATE.isAutoCompleting = true;
             UI.updateProgress(0, answers.length, 'Đang chuẩn bị...');

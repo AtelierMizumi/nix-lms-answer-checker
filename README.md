@@ -3,6 +3,7 @@
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/platform-Browser-orange?style=for-the-badge" alt="Platform">
   <img src="https://visitor-badge.laobi.icu/badge?page_id=AtelierMizumi.nix-lms-answer-checker" alt="Visitors">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.counterapi.dev%2Fv1%2Fnix-lms-answer-checker%2Fautofill&query=%24.count&label=Autofill%20uses&color=0f766e" alt="Autofill uses">
 </p>
 
 <h1 align="center">NIX LMS Answer Helper</h1>
@@ -113,10 +114,14 @@ trực tiếp vào DevTools.
 
 ## Quyền riêng tư
 
-Script xử lý response và giao diện trong trình duyệt. Runtime không chủ động gửi
-dữ liệu quiz đến server riêng. README tải visitor badge từ
-`visitor-badge.laobi.icu`; badge này là dịch vụ bên ngoài của tài liệu, không
-phải luồng xử lý dữ liệu của script.
+Script xử lý response và giao diện trong trình duyệt. Runtime không gửi nội dung
+quiz, đáp án, URL câu hỏi hoặc thông tin tài khoản ra ngoài. Mỗi khi một phiên
+autofill thực sự bắt đầu, script gửi một request counter không chứa dữ liệu quiz
+đến CounterAPI để cập nhật badge **Autofill uses** trong README. Nếu dịch vụ này
+không hoạt động, autofill vẫn tiếp tục bình thường.
+
+README cũng tải visitor badge từ `visitor-badge.laobi.icu`; đây là dịch vụ bên
+ngoài của tài liệu, không phải luồng xử lý dữ liệu quiz.
 
 ## Cấu trúc dự án
 
