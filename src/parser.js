@@ -50,9 +50,10 @@ export const Parser = {
         const result = {
             id: q.id,
             type: q.type,
-            order: q.order || index + 1,
+            order: Number.isInteger(qWrapper?.order) ? qWrapper.order + 1 : q.order || index + 1,
             title: this.cleanHtml(q.title),
             content: this.cleanHtml(q.content || ''),
+            shuffled: q.shuffle_answers === 1,
             answers: []
         };
 
@@ -165,6 +166,7 @@ export const Parser = {
                             question: this.cleanHtml(ansObj.content),
                             answer: match.answer_matching,
                             answerId: match.answer_id,
+                            matchingId: match.id,
                             type: 'match'
                         });
                     }
@@ -185,19 +187,34 @@ export const Parser = {
         }
         // STRATEGY: TYPE 7 (Fill in blank / Short Answer / Single Choice Dropdown)
         else if (q.type === 7 && q.answers) {
+            let submittedAnswers = {};
+            try {
+                submittedAnswers = JSON.parse(qWrapper?.answer || '{}').data || {};
+            } catch (_e) {
+                /* The submission answer is optional. */
+            }
+
             q.answers.forEach((ans, idx) => {
                 try {
                     const contentObj = JSON.parse(ans.content);
 
                     // Handle single-choice dropdown/radio type
                     if (contentObj.type === 'single-choice' && contentObj.child_answers) {
-                        const correctIdx = contentObj.correctAnswerIndex;
+                        const submittedContent = submittedAnswers[String(ans.id)];
+                        const submittedIndex = contentObj.child_answers.findIndex(
+                            child => child.content === submittedContent
+                        );
+                        const correctIdx =
+                            typeof submittedContent === 'string' && submittedIndex >= 0
+                                ? submittedIndex
+                                : contentObj.correctAnswerIndex;
                         if (correctIdx !== undefined && contentObj.child_answers[correctIdx]) {
                             result.answers.push({
                                 content: contentObj.child_answers[correctIdx].content,
                                 allOptions: contentObj.child_answers.map(c => c.content),
                                 correctIndex: correctIdx,
                                 order: idx + 1,
+                                answerId: ans.id,
                                 type: 'dropdown-choice'
                             });
                         }

@@ -1,316 +1,144 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.2.0-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/platform-Browser-orange?style=for-the-badge" alt="Platform">
   <img src="https://visitor-badge.laobi.icu/badge?page_id=AtelierMizumi.nix-lms-answer-checker" alt="Visitors">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.counterapi.dev%2Fv1%2Fnix-lms-answer-checker%2Fautofill&query=%24.count&label=Autofill%20uses&color=0f766e" alt="Autofill uses">
 </p>
 
-<h1 align="center">🤖 NIX LMS Answer Helper</h1>
+<h1 align="center">NIX LMS Answer Helper</h1>
 
 <p align="center">
-  <strong>Tự động trích xuất và hiển thị đáp án từ NIX Digital LMS</strong><br>
-  <em>Hỗ trợ auto-fill thông minh cho nhiều loại câu hỏi</em>
+  Hiển thị response đáp án từ NIX Digital LMS và hỗ trợ điền đáp án vào quiz.
 </p>
 
-<p align="center">
-  <a href="#-cài-đặt-nhanh">Cài đặt</a> •
-  <a href="#-tính-năng">Tính năng</a> •
-  <a href="#-hướng-dẫn-sử-dụng">Hướng dẫn</a> •
-  <a href="#-english">English</a>
-</p>
+## Cài đặt nhanh
 
----
+### Tampermonkey, khuyến nghị
 
-## 🚀 Cài đặt nhanh
+Tampermonkey là cách cài chính. Script sẽ tự nạp khi mở
+`https://digital.nix.edu.vn` và có thể tự cập nhật từ GitHub.
 
-### Cách 1: Tampermonkey (Khuyến nghị) ⭐
+1. Cài [Tampermonkey](https://www.tampermonkey.net/).
+2. Mở trình quản lý Tampermonkey bằng cách bấm biểu tượng extension, sau đó chọn
+   **Dashboard**.
+3. Mở tab **Utilities**.
+4. Tại mục **Install from URL**, dán URL sau:
 
-> Script tự động chạy mỗi khi bạn truy cập NIX LMS!
+`https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js`
 
-| Bước | Hành động                                                                     |
-| :--: | ----------------------------------------------------------------------------- |
-|  1️⃣  | Cài đặt [Tampermonkey](https://www.tampermonkey.net/) cho trình duyệt của bạn |
-|  2️⃣  | Click icon Tampermonkey → **"Create a new script"**                           |
-|  3️⃣  | Xóa hết nội dung mặc định                                                     |
-|  4️⃣  | Copy nội dung từ [`src/nix-helper.user.js`](src/nix-helper.user.js)           |
-|  5️⃣  | Paste vào Tampermonkey và **Save** (Ctrl+S)                                   |
-|  6️⃣  | Truy cập NIX LMS - Script tự động hoạt động! ✨                               |
+5. Bấm **Install** trong màn hình xác nhận của Tampermonkey.
+6. Quay lại `https://digital.nix.edu.vn` và tải lại trang quiz.
 
-### Cách 2: Console (Nhanh gọn)
+Domain hiện được hỗ trợ bởi userscript:
 
-```
-1. Mở DevTools (F12) → Tab Console
-2. Copy nội dung từ paste-to-console.js
-3. Paste vào Console → Enter
-4. Làm bài quiz - đáp án hiện tự động!
-```
+- `https://digital.nix.edu.vn/*`
 
----
+### Console paste, dùng khi cần chạy thủ công
 
-## ✨ Tính năng
+1. Mở đúng trang quiz trước khi có request cần theo dõi.
+2. Mở DevTools bằng `F12` hoặc `Ctrl+Shift+I`, sau đó chọn **Console**.
+3. Sao chép toàn bộ nội dung [paste-to-console.js](paste-to-console.js).
+4. Paste vào Console và nhấn Enter.
+5. Thực hiện lại thao tác check hoặc submit để tạo request.
 
-<table>
-<tr>
-<td width="50%">
+Script chỉ xử lý response từ endpoint có chuỗi `quiz-submission-check-answer`.
+Nếu request đã hoàn tất trước khi script được nạp, hãy thực hiện lại thao tác
+đó.
 
-### 📡 Tự động bắt đáp án
+## Cách sử dụng
 
-- Chặn API response tự động
-- Không cần thao tác thủ công
-- Hỗ trợ XMLHttpRequest & Fetch
+Khi bắt được response, popup sẽ hiển thị các câu hỏi và đáp án. Các thao tác
+chính:
 
-</td>
-<td width="50%">
+- **Điền đáp án ngay**: chạy thủ công bộ đáp án đang hiển thị.
+- **Tự động điền đáp án**: bật toggle để tự điền một lần khi nhận được kết quả
+  Check Answer mới; response giống lần trước sẽ không chạy lại.
+- Nút thu nhỏ và đóng popup: điều khiển giao diện hiển thị.
 
-### 🎯 Auto-Fill thông minh
+Trạng thái toggle được lưu trong trình duyệt bằng `localStorage`, nên lựa chọn
+của bạn vẫn được giữ sau khi tải lại trang. Khi tắt, script chỉ hiển thị đáp án
+và không tự thay đổi form quiz.
 
-- Điền form tự động
-- Hỗ trợ drag & drop
-- Mô phỏng sự kiện chính xác
+Popup cũng hiển thị bộ đếm lượt sử dụng. Bộ đếm bắt đầu từ `403` và được tăng
+mỗi khi một phiên điền đáp án thực sự bắt đầu, dù được kích hoạt tự động hay
+bằng nút **Điền đáp án ngay**. Đây là bộ đếm cục bộ trên thiết bị của bạn, không
+phải số liệu global trên GitHub và không gửi dữ liệu quiz ra ngoài.
 
-</td>
-</tr>
-<tr>
-<td>
+Các loại câu hỏi hiện có logic xử lý gồm Type 3 drag-order, Type 4
+drag-position, Type 5 matching, Type 7 fill-blank và các câu hỏi lựa chọn thông
+thường.
 
-### 🎨 Giao diện đẹp
+Auto-fill phụ thuộc vào selector, event handler và kích thước DOM thực tế của
+NIX LMS. Thanh tiến trình trong popup hiển thị câu hiện đang xử lý và tổng số
+câu. Hãy kiểm tra kết quả trên trang trước khi submit.
 
-- Popup kéo thả được
-- Thiết kế hiện đại
-- Phân loại theo màu sắc
+## Khắc phục sự cố
 
-</td>
-<td>
+### Tampermonkey không chạy
 
-### 📋 Tiện ích
+- Kiểm tra extension và userscript đang được bật.
+- Kiểm tra trang hiện tại là `https://digital.nix.edu.vn`.
+- Tải lại trang sau khi cài hoặc cập nhật script.
+- Mở Console để kiểm tra lỗi JavaScript.
 
-- Copy đáp án 1 click
-- Thu nhỏ/phóng to popup
-- Debug mode cho developer
+### Không thấy đáp án
 
-</td>
-</tr>
-</table>
+- Đảm bảo script đã được nạp trước thao tác check/submit.
+- Thực hiện lại thao tác để tạo request mới.
+- Trong Network, kiểm tra request có chứa `quiz-submission-check-answer`.
+- Khi dùng console paste, kiểm tra Console để xem log bắt response.
 
----
+### Auto-fill không hoạt động
 
-## 📚 Loại câu hỏi hỗ trợ
+- Đợi trang quiz tải hoàn toàn.
+- Kiểm tra Console có lỗi selector hoặc event không.
+- Một số thao tác kéo thả cần jQuery UI hoặc cấu trúc DOM tương ứng.
+- Dùng **Điền đáp án ngay** để chạy lại thủ công sau khi trang đã sẵn sàng.
 
-| Type | Loại câu hỏi             | Hiển thị | Auto-Fill |
-| :--: | ------------------------ | :------: | :-------: |
-| 🎯 3 | Kéo thả theo thứ tự      |    ✅    |    ✅     |
-| 📐 4 | Kéo thả theo tọa độ      |    ✅    |    ✅     |
-| 🔗 5 | Ghép nối (Matching)      |    ✅    |    ✅     |
-| ✍️ 7 | Điền vào chỗ trống       |    ✅    |    ✅     |
-| 📝 1 | Trắc nghiệm đơn          |    ✅    |    ✅     |
-| ☑️ 2 | Trắc nghiệm nhiều đáp án |    ✅    |    ✅     |
+## Phát triển
 
----
+Node.js 18 trở lên được dùng cho test và build.
 
-## 📖 Hướng dẫn sử dụng
-
-### Bước 1: Cài đặt script
-
-Làm theo hướng dẫn ở phần [Cài đặt nhanh](#-cài-đặt-nhanh)
-
-### Bước 2: Truy cập quiz
-
-Vào trang quiz trên NIX LMS. Popup sẽ xuất hiện ở góc phải màn hình:
-
-```
-┌─────────────────────────────────────┐
-│ 🤖 NIX Helper (Tampermonkey)    _ × │
-├─────────────────────────────────────┤
-│                                     │
-│         📡 Waiting for quiz...      │
-│                                     │
-├─────────────────────────────────────┤
-│  🚀 Auto-Fill  │  📋 Copy All       │
-└─────────────────────────────────────┘
+```bash
+npm install
+npm test
+npm run lint
+npm run format:check
+npm run build
 ```
 
-### Bước 3: Làm bài quiz
+`npm run build` tạo `dist/nix-helper.user.js`, là artifact userscript được
+Tampermonkey cài và cập nhật. `paste-to-console.js` là runtime nguồn có thể copy
+trực tiếp vào DevTools.
 
-Bắt đầu làm quiz bình thường. Khi bạn submit hoặc check đáp án:
+## Quyền riêng tư
 
-- Script tự động bắt response từ server
-- Đáp án hiển thị trong popup
-- Mỗi loại câu hỏi có màu riêng
+Script xử lý response và giao diện trong trình duyệt. Runtime không gửi nội dung
+quiz, đáp án, URL câu hỏi hoặc thông tin tài khoản ra ngoài. Mỗi khi một phiên
+autofill thực sự bắt đầu, script gửi một request counter không chứa dữ liệu quiz
+đến CounterAPI để cập nhật badge **Autofill uses** trong README. Nếu dịch vụ này
+không hoạt động, autofill vẫn tiếp tục bình thường.
 
-### Bước 4: Sử dụng đáp án
+README cũng tải visitor badge từ `visitor-badge.laobi.icu`; đây là dịch vụ bên
+ngoài của tài liệu, không phải luồng xử lý dữ liệu quiz.
 
-| Nút              | Chức năng                           |
-| ---------------- | ----------------------------------- |
-| 🚀 **Auto-Fill** | Tự động điền tất cả đáp án vào form |
-| 📋 **Copy All**  | Copy đáp án ra clipboard            |
-| **\_**           | Thu nhỏ popup                       |
-| **×**            | Đóng popup                          |
+## Cấu trúc dự án
 
----
-
-## 🎨 Giao diện hiển thị đáp án
-
-Mỗi loại câu hỏi được hiển thị với màu sắc và icon riêng:
-
-```
-┌─ 🎯 Q1: Sắp xếp theo thứ tự ────────────────┐
-│  Type 3 • 4 answer(s)                       │
-│  ┌────────────────────────────────────────┐ │
-│  │ 📍 Drag "Bước 1" → Position #1         │ │
-│  │ 📍 Drag "Bước 2" → Position #2         │ │
-│  │ 📍 Drag "Bước 3" → Position #3         │ │
-│  └────────────────────────────────────────┘ │
-└─────────────────────────────────────────────┘
-
-┌─ 🔗 Q2: Ghép nối thuật ngữ ─────────────────┐
-│  Type 5 • 3 answer(s)                       │
-│  ┌────────────────────────────────────────┐ │
-│  │ 🔗 HTML → Ngôn ngữ đánh dấu            │ │
-│  │ 🔗 CSS → Định dạng giao diện           │ │
-│  │ 🔗 JS → Lập trình client               │ │
-│  └────────────────────────────────────────┘ │
-└─────────────────────────────────────────────┘
-```
-
----
-
-## ⚙️ Cấu hình
-
-Chỉnh sửa phần `CONFIG` trong script:
-
-```javascript
-const CONFIG = {
-    DEBUG: false, // Bật console log chi tiết
-    AUTO_FILL_DELAY: 500 // Độ trễ giữa mỗi câu (ms)
-};
-```
-
----
-
-## 🛠️ Khắc phục sự cố
-
-<details>
-<summary><b>❓ Script không chạy trên Tampermonkey</b></summary>
-
-1. Kiểm tra Tampermonkey đã enabled
-2. Kiểm tra URL match pattern trong script header
-3. Thử refresh trang (F5)
-4. Kiểm tra Console (F12) có lỗi không
-
-</details>
-
-<details>
-<summary><b>❓ Đáp án không hiện</b></summary>
-
-1. Đảm bảo đang ở trang quiz với câu hỏi
-2. Thử submit/check answer để trigger API
-3. Kiểm tra Network tab có request `quiz-submission-check-answer`
-4. Bật DEBUG mode để xem log chi tiết
-
-</details>
-
-<details>
-<summary><b>❓ Auto-Fill không hoạt động</b></summary>
-
-1. Đợi trang load hoàn toàn
-2. Kiểm tra Console có lỗi JavaScript
-3. Một số loại câu hỏi cần jQuery UI
-4. Thử fill thủ công theo thông tin hiển thị
-
-</details>
-
----
-
-## 🔒 Bảo mật & Quyền riêng tư
-
-| Đặc điểm                 | Mô tả                                  |
-| ------------------------ | -------------------------------------- |
-| 🏠 **Xử lý cục bộ**      | Mọi thứ chạy trong trình duyệt của bạn |
-| 🚫 **Không gửi dữ liệu** | Script không kết nối server bên ngoài  |
-| 🔐 **Không lưu trữ**     | Đáp án chỉ tồn tại trong session       |
-
----
-
-## 📁 Cấu trúc dự án
-
-```
+```text
 nix-lms-answer-checker/
-├── 📄 paste-to-console.js    # Phiên bản paste vào Console
-├── 📁 src/
-│   └── 🔧 nix-helper.user.js # Phiên bản Tampermonkey
-├── 📁 tests/fixtures/         # Sample JSON để test
-├── 📁 .agent/workflows/       # Hướng dẫn cho developer
-├── 📄 package.json
-├── 📄 README.md
-└── 📄 LICENSE
+├── paste-to-console.js       # Runtime canonical cho console và build
+├── dist/nix-helper.user.js    # Userscript Tampermonkey được build
+├── src/parser.js              # Parser được test
+├── tests/                     # Vitest và fixture
+├── scripts/build-userscript.mjs
+├── package.json
+└── README.md
 ```
 
----
+## Giấy phép
 
-## 🤝 Đóng góp
+MIT. Xem [LICENSE](LICENSE).
 
-Mọi đóng góp đều được hoan nghênh! Xem [workflows](.agent/workflows/) để biết
-cách:
-
-- Thêm loại câu hỏi mới
-- Debug và test
-- Build project
-
----
-
-## 📄 License
-
-MIT License - Xem [LICENSE](LICENSE)
-
-> ⚠️ **Lưu ý**: Công cụ này chỉ dành cho mục đích học tập. Hãy sử dụng có trách
-> nhiệm và tuân thủ quy định của tổ chức giáo dục.
-
----
-
-<h2 id="-english">🇬🇧 English</h2>
-
-<details>
-<summary><b>Click to expand English documentation</b></summary>
-
-### Quick Start
-
-**Tampermonkey (Recommended):**
-
-1. Install [Tampermonkey](https://www.tampermonkey.net/)
-2. Create new script → paste content from `src/nix-helper.user.js`
-3. Save and visit NIX LMS
-
-**Console:**
-
-1. Open DevTools (F12)
-2. Paste `paste-to-console.js` content
-3. Start quiz
-
-### Features
-
-- 📡 Auto-capture quiz answers from API
-- 🎯 Smart auto-fill for all question types
-- 🎨 Beautiful draggable popup UI
-- 📋 One-click copy answers
-
-### Supported Question Types
-
-- Type 3: Drag & drop ordering
-- Type 4: Drag & drop positioning
-- Type 5: Matching questions
-- Type 7: Fill in the blank
-- Standard: Multiple choice, checkboxes
-
-### Troubleshooting
-
-- Enable DEBUG mode for detailed logs
-- Check Console (F12) for errors
-- Ensure you're on a quiz page
-
-</details>
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/AtelierMizumi">AtelierMizumi</a>
-</p>
+> Công cụ dành cho mục đích học tập. Hãy sử dụng có trách nhiệm và tuân thủ quy
+> định của tổ chức giáo dục.

@@ -6,7 +6,7 @@
  * 2. Modular design: Network, Parser, Solver, UI, Utils.
  * 3. Strategy Pattern for different question types (Type 3, 4, 5, 7).
  * 4. Safe DOM manipulation and Event simulation.
- * 5. Debug mode with manual JSON paste for testing.
+ * 5. Compact UI with a persisted auto-fill preference.
  */
 
 (function () {
@@ -14,8 +14,11 @@
 
     // --- CONFIGURATION & STATE ---
     const CONFIG = {
-        DEBUG: true,
-        AUTO_FILL_DELAY: 500, // ms
+        AUTO_FILL_DELAY: 0,
+        AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
+        USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-count',
+        USAGE_COUNT_START: 403,
+        USAGE_ANALYTICS_URL: 'https://api.counterapi.dev/v1/nix-lms-answer-checker/autofill/up',
         SELECTORS: {
             QUESTION_CONTAINER: '.question-container, .questions', // Generic container
             // Type 3 - actual DOM selectors from Nix LMS
@@ -28,13 +31,17 @@
     const STATE = {
         answers: [],
         isAutoCompleting: false,
-        uiVisible: true
+        uiVisible: true,
+        autoFillEnabled: false,
+        usageCount: 403,
+        lastResponseFingerprint: null,
+        progress: { current: 0, total: 0, label: 'Sẵn sàng' }
     };
 
     // --- MODULE: UTILS ---
     const Utils = {
         log(...args) {
-            if (CONFIG.DEBUG) console.log('🥷 [NIX-Helper]:', ...args);
+            console.log('[NIX Helper]', ...args);
         },
 
         error(...args) {
@@ -73,11 +80,54 @@
             });
         },
 
-        copyToClipboard(text) {
-            if (navigator.clipboard) {
-                return navigator.clipboard.writeText(text);
+        loadAutoFillPreference() {
+            try {
+                return window.localStorage.getItem(CONFIG.AUTO_FILL_STORAGE_KEY) === 'true';
+            } catch (_e) {
+                return false;
             }
-            return Promise.reject('Clipboard API not available');
+        },
+
+        saveAutoFillPreference(enabled) {
+            try {
+                window.localStorage.setItem(CONFIG.AUTO_FILL_STORAGE_KEY, String(enabled));
+            } catch (_e) {
+                /* Storage can be unavailable in restricted browser contexts. */
+            }
+        },
+
+        loadUsageCount() {
+            try {
+                const stored = Number.parseInt(window.localStorage.getItem(CONFIG.USAGE_COUNT_STORAGE_KEY), 10);
+                return Number.isFinite(stored) && stored >= CONFIG.USAGE_COUNT_START
+                    ? stored
+                    : CONFIG.USAGE_COUNT_START;
+            } catch (_e) {
+                return CONFIG.USAGE_COUNT_START;
+            }
+        },
+
+        incrementUsageCount() {
+            const nextCount = Utils.loadUsageCount() + 1;
+            try {
+                window.localStorage.setItem(CONFIG.USAGE_COUNT_STORAGE_KEY, String(nextCount));
+            } catch (_e) {
+                /* Storage can be unavailable in restricted browser contexts. */
+            }
+            return nextCount;
+        },
+
+        trackUsage() {
+            window
+                .fetch(CONFIG.USAGE_ANALYTICS_URL, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    keepalive: true
+                })
+                .catch(() => {
+                    // Analytics failure must never interrupt answer filling.
+                });
         },
 
         /**
@@ -129,10 +179,11 @@
         processQuestion(q, qWrapper, index) {
             const result = {
                 id: q.id,
-                order: index + 1,
+                order: Number.isInteger(qWrapper?.order) ? qWrapper.order + 1 : index + 1,
                 title: this.cleanHtml(q.title || ''),
                 content: this.cleanHtml(q.content || ''),
                 type: q.type,
+                shuffled: q.shuffle_answers === 1,
                 answers: [] // Format: { content: "...", index: 1, ...metadata }
             };
 
@@ -220,6 +271,7 @@
                             question: this.cleanHtml(ansObj.content),
                             answer: match.answer_matching,
                             answerId: match.answer_id,
+                            matchingId: match.id,
                             type: 'match'
                         });
                     }
@@ -227,19 +279,34 @@
             }
             // STRATEGY: TYPE 7 (Fill in blank / Short Answer / Single Choice Dropdown)
             else if (q.type === 7 && q.answers) {
+                let submittedAnswers = {};
+                try {
+                    submittedAnswers = JSON.parse(qWrapper?.answer || '{}').data || {};
+                } catch (_e) {
+                    /* The submission answer is optional. */
+                }
+
                 q.answers.forEach((ans, idx) => {
                     try {
                         const contentObj = JSON.parse(ans.content);
 
                         // Handle single-choice dropdown/radio type
                         if (contentObj.type === 'single-choice' && contentObj.child_answers) {
-                            const correctIdx = contentObj.correctAnswerIndex;
+                            const submittedContent = submittedAnswers[String(ans.id)];
+                            const submittedIndex = contentObj.child_answers.findIndex(
+                                child => child.content === submittedContent
+                            );
+                            const correctIdx =
+                                typeof submittedContent === 'string' && submittedIndex >= 0
+                                    ? submittedIndex
+                                    : contentObj.correctAnswerIndex;
                             if (correctIdx !== undefined && contentObj.child_answers[correctIdx]) {
                                 result.answers.push({
                                     content: contentObj.child_answers[correctIdx].content,
                                     allOptions: contentObj.child_answers.map(c => c.content),
                                     correctIndex: correctIdx,
                                     order: idx + 1,
+                                    answerId: ans.id,
                                     type: 'dropdown-choice'
                                 });
                             }
@@ -294,28 +361,61 @@
     // Handles the logic of applying answers to the DOM
     const Solver = {
         async solve(answers) {
+            if (STATE.isAutoCompleting || !answers.length) return;
+            STATE.usageCount = Utils.incrementUsageCount();
+            UI.updateUsageCount();
+            Utils.trackUsage();
             Utils.log('🚀 Starting Auto-fill...');
             STATE.isAutoCompleting = true;
+            UI.updateProgress(0, answers.length, 'Đang chuẩn bị...');
 
-            for (const ans of answers) {
+            for (const [index, ans] of answers.entries()) {
                 if (!STATE.isAutoCompleting) break;
+                UI.updateProgress(index, answers.length, `Đang xử lý câu ${index + 1}/${answers.length}`);
                 await this.fillQuestion(ans);
-                // Small delay between questions
-                await new Promise(r => setTimeout(r, CONFIG.AUTO_FILL_DELAY));
+                UI.updateProgress(index + 1, answers.length, `Đã xử lý câu ${index + 1}/${answers.length}`);
+                if (CONFIG.AUTO_FILL_DELAY > 0) {
+                    await new Promise(r => setTimeout(r, CONFIG.AUTO_FILL_DELAY));
+                }
             }
 
             Utils.log('🏁 Auto-fill finished.');
             STATE.isAutoCompleting = false;
+            UI.updateProgress(
+                STATE.progress.current,
+                answers.length,
+                STATE.progress.current === answers.length ? 'Hoàn tất điền đáp án' : 'Đã dừng'
+            );
         },
 
         async fillQuestion(questionData) {
             // Try multiple selector strategies to find the question container
             let container = null;
 
-            // Strategy 1: Data attribute
-            container = await Utils.waitForElement(`[data-id="${questionData.id}"]`, document, 2000);
+            // Strategy 1: Question ID attributes used by different LMS renderers
+            const questionSelectors = [
+                `[data-id="${questionData.id}"]`,
+                `[data-question-id="${questionData.id}"]`,
+                `[data-question="${questionData.id}"]`,
+                `[data-id-question="${questionData.id}"]`
+            ];
+            for (const selector of questionSelectors) {
+                container = await Utils.waitForElement(selector, document, 500);
+                if (container) break;
+            }
 
-            // Strategy 2: Find by order
+            // Strategy 2: Find a container holding one of this question's answer IDs
+            if (!container && questionData.answers.some(answer => answer.answerId)) {
+                const answerIds = new Set(questionData.answers.map(answer => String(answer.answerId)));
+                const possibleContainers = document.querySelectorAll(CONFIG.SELECTORS.QUESTION_CONTAINER);
+                container = Array.from(possibleContainers).find(candidate =>
+                    Array.from(
+                        candidate.querySelectorAll('input, select, option, [data-answer-id], [data-answer]')
+                    ).some(element => [...this.getControlAnswerIds(element)].some(id => answerIds.has(id)))
+                );
+            }
+
+            // Strategy 3: Find by local question order
             if (!container) {
                 const allQuestions = document.querySelectorAll(CONFIG.SELECTORS.QUESTION_CONTAINER);
                 container = allQuestions[questionData.order - 1];
@@ -401,7 +501,9 @@
                     draggableInfo.used = true;
                 }
 
-                await new Promise(r => setTimeout(r, 150));
+                if (CONFIG.AUTO_FILL_DELAY > 0) {
+                    await new Promise(r => setTimeout(r, CONFIG.AUTO_FILL_DELAY));
+                }
             }
         },
 
@@ -507,38 +609,78 @@
         async handleType5(container, questionData) {
             Utils.log('🎯 Type 5 - Matching Questions');
 
-            const selects = container.querySelectorAll('select.answer-matching, select');
+            const selects = Array.from(container.querySelectorAll('select.answer-matching, select'));
+            const usedSelects = new Set();
 
             for (const answer of questionData.answers) {
-                // Find the select for this specific question
-                for (const select of selects) {
-                    const parentRow = select.closest('.d-flex, .row, .form-group');
-                    if (!parentRow) continue;
-
-                    const questionText = parentRow.textContent;
-                    if (questionText.includes(answer.question)) {
-                        // Find matching option
-                        const options = select.querySelectorAll('option');
-                        for (const option of options) {
-                            const optionText = option.textContent.trim();
-                            if (optionText === answer.answer || optionText.includes(answer.answer)) {
-                                select.value = option.value;
-
-                                // Trigger events
-                                if (window.$ && $(select).data('select2')) {
-                                    $(select).trigger('change');
-                                } else {
-                                    select.dispatchEvent(new Event('change', { bubbles: true }));
-                                }
-
-                                Utils.log(`✅ Matched: "${answer.question}" → "${answer.answer}"`);
-                                break;
-                            }
-                        }
-                        break;
-                    }
+                const select = this.findMatchingSelect(selects, answer, usedSelects);
+                if (!select) {
+                    Utils.log(`⚠️ Matching row not found for answer ${answer.answerId}`);
+                    continue;
                 }
+
+                const option = this.findMatchingOption(select, answer);
+                if (!option) {
+                    Utils.log(`⚠️ Matching option not found: "${answer.answer}"`);
+                    continue;
+                }
+
+                select.value = option.value;
+                select.dispatchEvent(new Event('input', { bubbles: true }));
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.$ && $(select).data('select2')) {
+                    $(select).trigger('change');
+                }
+                usedSelects.add(select);
+                Utils.log(`✅ Matched: "${answer.question}" → "${answer.answer}"`);
             }
+        },
+
+        findMatchingSelect(selects, answer, usedSelects) {
+            const answerId = String(answer.answerId ?? '');
+            const idMatch = selects.find(
+                select => !usedSelects.has(select) && answerId && this.getControlAnswerIds(select).includes(answerId)
+            );
+            if (idMatch) return idMatch;
+
+            return selects.find(select => {
+                if (usedSelects.has(select)) return false;
+                const row = this.getMatchingRow(select);
+                return row?.textContent?.includes(answer.question);
+            });
+        },
+
+        findMatchingOption(select, answer) {
+            const matchingId = String(answer.matchingId ?? '');
+            const options = Array.from(select.options);
+
+            if (matchingId) {
+                const idMatch = options.find(option => this.getControlAnswerIds(option).includes(matchingId));
+                if (idMatch) return idMatch;
+            }
+
+            return options.find(option => {
+                const optionText = option.textContent.trim();
+                return this.matchesAnswerText(optionText, answer.answer);
+            });
+        },
+
+        matchesAnswerText(candidate, expected) {
+            const candidateText = candidate.trim();
+            const expectedText = expected.trim();
+            if (!candidateText || !expectedText) return false;
+            return (
+                candidateText === expectedText ||
+                candidateText.includes(expectedText) ||
+                expectedText.includes(candidateText)
+            );
+        },
+
+        getMatchingRow(select) {
+            return (
+                select.closest('[data-answer-id], .matching-row, .matching-item, .d-flex, .row, .form-group, tr, li') ||
+                select.parentElement
+            );
         },
 
         // --- TYPE 7: Fill in the Blank / Dropdown Choice ---
@@ -555,18 +697,21 @@
                     let found = false;
 
                     // Method 1: Standard <select> dropdowns
-                    const selects = container.querySelectorAll('select');
-                    if (selects[dropdownIndex]) {
-                        const select = selects[dropdownIndex];
+                    const selects = Array.from(container.querySelectorAll('select'));
+                    const idSelect = selects.find(
+                        select => answer.answerId && this.getControlAnswerIds(select).includes(String(answer.answerId))
+                    );
+                    const select = idSelect || selects[dropdownIndex];
+                    if (select) {
                         for (const option of select.querySelectorAll('option')) {
                             const optionText = option.textContent.trim();
-                            if (
-                                optionText === answerText ||
-                                optionText.includes(answerText) ||
-                                answerText.includes(optionText)
-                            ) {
+                            if (this.matchesAnswerText(optionText, answerText)) {
                                 select.value = option.value;
+                                select.dispatchEvent(new Event('input', { bubbles: true }));
                                 select.dispatchEvent(new Event('change', { bubbles: true }));
+                                if (window.$ && $(select).data('select2')) {
+                                    $(select).trigger('change');
+                                }
                                 Utils.log(`✅ [Blank ${answer.order}] Selected dropdown: "${optionText}"`);
                                 found = true;
                                 break;
@@ -644,70 +789,26 @@
         async handleStandard(container, questionData) {
             Utils.log('🎯 Standard Question Type');
 
+            const controls = Array.from(container.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
+            const radios = controls.filter(control => control.type === 'radio');
+            const checkboxes = controls.filter(control => control.type === 'checkbox');
+
             for (const answer of questionData.answers) {
-                // Try radio buttons
-                const radios = container.querySelectorAll('input[type="radio"]');
-                const radioArray = Array.from(radios);
+                const target = this.findStandardAnswer(controls, answer, questionData);
 
-                // Method 1: Image-based answer - match by index
-                if (answer.isImage && answer.correctIndex !== undefined) {
-                    const targetRadio = radioArray[answer.correctIndex];
-                    if (targetRadio) {
-                        targetRadio.checked = true;
-                        targetRadio.click();
-                        targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
-                        Utils.log(`✅ Selected image radio at index ${answer.correctIndex}`);
-                        return;
-                    }
+                if (target) {
+                    this.activateAnswerControl(target);
+                    Utils.log(`✅ Selected answer ${answer.answerId ?? '(matched by content)'}`);
+                    continue;
                 }
 
-                // Method 2: Image match by src in rawHtml
-                if (answer.rawHtml && answer.rawHtml.includes('<img')) {
-                    const srcMatch = answer.rawHtml.match(/src=["']([^"']+)["']/);
-                    if (srcMatch) {
-                        const imgSrc = srcMatch[1];
-                        for (const radio of radioArray) {
-                            const label = radio.closest('label') || radio.parentElement;
-                            const img = label?.querySelector('img');
-                            if (img && img.src.includes(imgSrc.split('/').pop())) {
-                                radio.checked = true;
-                                radio.click();
-                                radio.dispatchEvent(new Event('change', { bubbles: true }));
-                                Utils.log('✅ Selected radio by image src match');
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                // Method 3: Text-based matching (original logic)
-                for (const radio of radioArray) {
-                    const label = radio.closest('label') || radio.parentElement;
-                    if (label && answer.content && label.textContent.includes(answer.content)) {
-                        radio.checked = true;
-                        radio.dispatchEvent(new Event('change', { bubbles: true }));
-                        Utils.log(`✅ Selected radio: "${answer.content}"`);
-                        return;
-                    }
-                }
-
-                // Try checkboxes
-                const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-                for (const checkbox of checkboxes) {
-                    const label = checkbox.closest('label') || checkbox.parentElement;
-                    if (label && label.textContent.includes(answer.content)) {
-                        checkbox.checked = true;
-                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                        Utils.log(`✅ Checked: "${answer.content}"`);
-                    }
-                }
-
-                // Try dropdowns
-                const selects = container.querySelectorAll('select');
-                for (const select of selects) {
-                    const options = select.querySelectorAll('option');
-                    for (const option of options) {
-                        if (option.textContent.trim() === answer.content) {
+                if (answer.content) {
+                    const selects = container.querySelectorAll('select');
+                    for (const select of selects) {
+                        const option = Array.from(select.options).find(
+                            item => item.textContent.trim() === answer.content
+                        );
+                        if (option) {
                             select.value = option.value;
                             select.dispatchEvent(new Event('change', { bubbles: true }));
                             Utils.log(`✅ Selected dropdown: "${answer.content}"`);
@@ -716,6 +817,102 @@
                     }
                 }
             }
+
+            Utils.log(`ℹ️ Standard controls: ${radios.length} radio, ${checkboxes.length} checkbox`);
+        },
+
+        findStandardAnswer(controls, answer, questionData) {
+            const answerId = String(answer.answerId ?? '');
+            const imageSrc = this.getAnswerImageSrc(answer.rawHtml);
+
+            if (answerId) {
+                const idMatch = controls.find(control => this.getControlAnswerIds(control).includes(answerId));
+                if (idMatch) return idMatch;
+            }
+
+            if (imageSrc) {
+                const imageMatch = controls.find(control => {
+                    const image = this.getControlContainer(control)?.querySelector('img');
+                    return image && this.sameImage(image.src, imageSrc);
+                });
+                if (imageMatch) return imageMatch;
+            }
+
+            if (answer.content) {
+                const textMatch = controls.find(control => {
+                    const option = this.getControlContainer(control);
+                    return option?.textContent?.includes(answer.content);
+                });
+                if (textMatch) return textMatch;
+            }
+
+            if (!questionData.shuffled && answer.correctIndex !== undefined) {
+                return controls[answer.correctIndex] || null;
+            }
+
+            Utils.log(`⚠️ Could not match answer ${answer.answerId ?? '(no ID)'}`);
+            return null;
+        },
+
+        getControlContainer(control) {
+            return (
+                control.closest(
+                    'label, [data-answer-id], [data-answer], [data-option-id], .answer-option, .form-check, li, .choice, .option'
+                ) || control.parentElement
+            );
+        },
+
+        getControlAnswerIds(control) {
+            const ids = [];
+            let current = control;
+            let depth = 0;
+            while (current && depth < 4) {
+                ['value', 'id', 'data-id', 'data-answer-id', 'data-answer', 'data-option-id', 'data-value'].forEach(
+                    attribute => {
+                        const value = current.getAttribute?.(attribute);
+                        if (value == null) return;
+                        const normalized = value.trim();
+                        if (/^\d+$/.test(normalized)) {
+                            ids.push(normalized);
+                        } else {
+                            const suffix = normalized.match(/(?:^|[_:-])(\d+)$/);
+                            if (suffix) ids.push(suffix[1]);
+                        }
+                    }
+                );
+                current = current.parentElement;
+                depth++;
+            }
+            return [...new Set(ids)];
+        },
+
+        getAnswerImageSrc(rawHtml) {
+            if (!rawHtml || !rawHtml.includes('<img')) return null;
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = rawHtml;
+            return wrapper.querySelector('img')?.src || null;
+        },
+
+        sameImage(firstSrc, secondSrc) {
+            try {
+                const first = new window.URL(firstSrc, window.location.href);
+                const second = new window.URL(secondSrc, window.location.href);
+                return first.href === second.href || first.pathname === second.pathname;
+            } catch (_e) {
+                return firstSrc === secondSrc;
+            }
+        },
+
+        activateAnswerControl(control) {
+            if (control.type === 'radio' && control.checked) return;
+            if (control.type === 'checkbox' && control.checked) return;
+
+            control.click();
+            if (!control.checked) {
+                this.getControlContainer(control)?.click();
+            }
+            control.dispatchEvent(new Event('input', { bubbles: true }));
+            control.dispatchEvent(new Event('change', { bubbles: true }));
         },
 
         /**
@@ -792,6 +989,8 @@
         root: null,
 
         init() {
+            STATE.autoFillEnabled = Utils.loadAutoFillPreference();
+            STATE.usageCount = Utils.loadUsageCount();
             this.createOverlay();
             this.setupDrag();
         },
@@ -802,47 +1001,51 @@
             const div = document.createElement('div');
             div.id = 'nix-helper-root';
             div.style.cssText = `
-                position: fixed; top: 20px; right: 20px; width: 450px;
-                background: #fff; border: 2px solid #333; border-radius: 10px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 99999;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                font-size: 13px;
+                position: fixed; top: 20px; right: 20px; width: min(390px, calc(100vw - 32px));
+                background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 14px;
+                box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22); z-index: 99999;
+                font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-size: 13px; color: #1e293b; overflow: hidden;
             `;
 
-            // Debug input area
-            const debugHtml = CONFIG.DEBUG
-                ? `
-                <div style="padding: 8px; border-bottom: 1px dashed #ccc; background: #f0f0f0;">
-                    <button id="nix-btn-debug" style="width:100%;padding:6px;font-size:11px;cursor:pointer;background:#ff9800;color:white;border:none;border-radius:4px;font-weight:bold;">
-                        🐞 Debug Mode: Paste JSON
-                    </button>
-                </div>
-            `
-                : '';
-
             div.innerHTML = `
-                <div id="nix-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 12px; cursor: move; display: flex; justify-content: space-between; align-items: center; border-radius: 10px 10px 0 0;">
-                    <span style="font-weight: bold; font-size: 14px;">🤖 NIX Helper <small style="opacity:0.8">(Stealth)</small></span>
-                    <div>
-                        <button id="nix-btn-min" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:3px;margin-right:5px;">_</button>
-                        <button id="nix-btn-close" style="background:rgba(255,0,0,0.6);border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:3px;">×</button>
+                <div id="nix-header" style="background: linear-gradient(135deg, #0f766e, #155e75); color: #fff; padding: 15px 16px; cursor: move; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 750; font-size: 15px; letter-spacing: 0.01em;">NIX Helper <small style="display:block;opacity:0.72;font-size:11px;font-weight:500;margin-top:2px;">Đáp án quiz</small></span>
+                    <div style="display:flex;gap:6px;">
+                        <button id="nix-btn-min" aria-label="Thu nhỏ" title="Thu nhỏ" style="width:30px;height:30px;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.25);color:#fff;cursor:pointer;border-radius:7px;font-size:16px;line-height:1;">−</button>
+                        <button id="nix-btn-close" aria-label="Đóng" title="Đóng" style="width:30px;height:30px;background:rgba(15,23,42,0.22);border:1px solid rgba(255,255,255,0.25);color:#fff;cursor:pointer;border-radius:7px;font-size:18px;line-height:1;">×</button>
                     </div>
                 </div>
-                ${debugHtml}
-                <div id="nix-content" style="max-height: 450px; overflow-y: auto; padding: 12px; background: #fafafa;">
-                    <div style="text-align:center; color: #999; padding: 30px 20px;">
-                        <div style="font-size:48px;margin-bottom:10px;">📡</div>
-                        <div style="font-weight:bold;margin-bottom:5px;">Waiting for quiz data...</div>
-                        <small>Start a quiz or use Debug Mode above</small>
+                <div id="nix-content" style="max-height: 430px; overflow-y: auto; padding: 14px; background: #f8fafc;">
+                    <div style="text-align:center; color: #64748b; padding: 34px 20px 30px;">
+                        <div style="font-size:34px;margin-bottom:12px;">◌</div>
+                        <div style="font-weight:700;margin-bottom:6px;color:#334155;">Đang chờ kết quả</div>
+                        <small>Thực hiện Check Answer để nhận đáp án.</small>
                     </div>
                 </div>
-                <div id="nix-footer" style="padding: 10px; border-top: 2px solid #eee; display: flex; gap: 8px; background: #f5f5f5; border-radius: 0 0 10px 10px;">
-                    <button id="nix-btn-fill" style="flex:1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
-                        🚀 Auto-Fill
-                    </button>
-                    <button id="nix-btn-copy" style="flex:1; padding: 10px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
-                        📋 Copy All
-                    </button>
+                <div id="nix-progress" style="padding: 10px 14px 0; background: #fff;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:11px;color:#64748b;">
+                        <span id="nix-progress-label">Sẵn sàng</span>
+                        <span id="nix-progress-count">0/0</span>
+                    </div>
+                    <div style="height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
+                        <div id="nix-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0f766e,#0891b2);border-radius:999px;transition:width .18s ease;"></div>
+                    </div>
+                </div>
+                <div id="nix-footer" style="padding: 12px 14px 14px; border-top: 0; display: flex; flex-direction:column; gap: 10px; background: #fff;">
+                    <button id="nix-btn-fill" style="width:100%;padding:9px 12px;background:#0f766e;color:white;border:0;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">Điền đáp án ngay</button>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                        <div>
+                            <div style="font-weight:700;color:#334155;">Tự động điền đáp án</div>
+                            <small id="nix-setting-status" style="color:#64748b;">${STATE.autoFillEnabled ? 'Đang bật cho kết quả mới' : 'Đang tắt'}</small>
+                        </div>
+                        <label style="position:relative;width:46px;height:26px;display:block;flex:0 0 auto;cursor:pointer;">
+                            <input id="nix-auto-fill-toggle" type="checkbox" ${STATE.autoFillEnabled ? 'checked' : ''} aria-label="Bật tự động điền đáp án mới" style="opacity:0;width:0;height:0;position:absolute;">
+                            <span style="position:absolute;inset:0;background:${STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1'};border-radius:999px;transition:background .2s;"></span>
+                            <span id="nix-toggle-knob" style="position:absolute;width:20px;height:20px;left:${STATE.autoFillEnabled ? '23px' : '3px'};top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:left .2s;"></span>
+                        </label>
+                    </div>
+                    <small id="nix-usage-count" style="color:#94a3b8;text-align:center;">Lượt sử dụng: ${STATE.usageCount}</small>
                 </div>
             `;
 
@@ -854,70 +1057,58 @@
             div.querySelector('#nix-btn-min').onclick = () => {
                 const content = div.querySelector('#nix-content');
                 const footer = div.querySelector('#nix-footer');
-                const debugBar = div.querySelector('#nix-btn-debug')?.parentElement;
+                const progress = div.querySelector('#nix-progress');
                 const isHidden = content.style.display === 'none';
                 content.style.display = isHidden ? 'block' : 'none';
                 footer.style.display = isHidden ? 'flex' : 'none';
-                if (debugBar) debugBar.style.display = isHidden ? 'block' : 'none';
+                progress.style.display = isHidden ? 'block' : 'none';
             };
 
             div.querySelector('#nix-btn-fill').onclick = () => {
-                if (STATE.answers.length === 0) {
-                    alert('No answers loaded yet!');
+                if (!STATE.answers.length) {
+                    this.updateProgress(0, 0, 'Chưa có kết quả để điền');
                     return;
                 }
                 Solver.solve(STATE.answers);
             };
 
-            div.querySelector('#nix-btn-copy').onclick = () => {
-                const text = STATE.answers
-                    .map(q => {
-                        const answerText = q.answers
-                            .map(a => {
-                                if (q.type === 3) return `${a.content} → pos ${a.targetIndex}`;
-                                if (q.type === 5) return `${a.question} → ${a.answer}`;
-                                return a.content;
-                            })
-                            .join('\n');
-                        return `Q${q.order}: ${q.title}\n${answerText}`;
-                    })
-                    .join('\n\n');
-
-                Utils.copyToClipboard(text).then(() => {
-                    const btn = div.querySelector('#nix-btn-copy');
-                    const orig = btn.textContent;
-                    btn.textContent = '✅ Copied!';
-                    btn.style.background = '#28a745';
-                    setTimeout(() => {
-                        btn.textContent = orig;
-                        btn.style.background = '#007bff';
-                    }, 1500);
-                });
+            div.querySelector('#nix-auto-fill-toggle').onchange = event => {
+                STATE.autoFillEnabled = event.target.checked;
+                Utils.saveAutoFillPreference(STATE.autoFillEnabled);
+                this.updateAutoFillToggle();
+                if (!STATE.autoFillEnabled) {
+                    STATE.isAutoCompleting = false;
+                }
             };
+        },
 
-            // Debug Event
-            if (CONFIG.DEBUG) {
-                div.querySelector('#nix-btn-debug').onclick = () => {
-                    const json = prompt(
-                        '📝 Paste the JSON response from Network tab:\n\n(The entire response from quiz-submission-check-answer endpoint)'
-                    );
-                    if (json) {
-                        try {
-                            const answers = Parser.parse(json);
-                            if (answers.length === 0) {
-                                alert('⚠️ No answers found in JSON. Check the structure.');
-                                return;
-                            }
-                            STATE.answers = answers;
-                            UI.renderAnswers(answers);
-                            Utils.log(`🐞 Debug: Loaded ${answers.length} questions from manual input.`);
-                        } catch (e) {
-                            alert('❌ Invalid JSON format!\n\n' + e.message);
-                            Utils.error('Debug parse failed:', e);
-                        }
-                    }
-                };
-            }
+        updateAutoFillToggle() {
+            const toggle = this.root?.querySelector('#nix-auto-fill-toggle');
+            const status = this.root?.querySelector('#nix-setting-status');
+            const track = toggle?.nextElementSibling;
+            const knob = this.root?.querySelector('#nix-toggle-knob');
+            if (!toggle || !status || !track || !knob) return;
+            toggle.checked = STATE.autoFillEnabled;
+            status.textContent = STATE.autoFillEnabled ? 'Đang bật cho kết quả mới' : 'Đang tắt';
+            track.style.background = STATE.autoFillEnabled ? '#0f766e' : '#cbd5e1';
+            knob.style.left = STATE.autoFillEnabled ? '23px' : '3px';
+        },
+
+        updateUsageCount() {
+            const usage = this.root?.querySelector('#nix-usage-count');
+            if (usage) usage.textContent = `Lượt sử dụng: ${STATE.usageCount}`;
+        },
+
+        updateProgress(current, total, label) {
+            STATE.progress = { current, total, label };
+            const progressLabel = this.root?.querySelector('#nix-progress-label');
+            const progressCount = this.root?.querySelector('#nix-progress-count');
+            const progressBar = this.root?.querySelector('#nix-progress-bar');
+            if (!progressLabel || !progressCount || !progressBar) return;
+            const percentage = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
+            progressLabel.textContent = label;
+            progressCount.textContent = `${current}/${total}`;
+            progressBar.style.width = `${percentage}%`;
         },
 
         renderAnswers(answers) {
@@ -943,23 +1134,11 @@
                 )
                 .join('');
 
-            // Bind copy events for combined text
-            content.querySelectorAll('.nix-copy-combined').forEach(btn => {
-                btn.onclick = e => {
-                    const text = e.target.dataset.text;
-                    Utils.copyToClipboard(text).then(() => {
-                        const orig = e.target.textContent;
-                        e.target.textContent = '✅';
-                        setTimeout(() => {
-                            e.target.textContent = orig;
-                        }, 1000);
-                    });
-                };
-            });
+            this.updateProgress(0, answers.length, 'Đã nhận kết quả mới');
 
             // Update header
             this.root.querySelector('#nix-header span').innerHTML =
-                `🤖 NIX Helper <small style="opacity:0.8">(${answers.length} Questions)</small>`;
+                `NIX Helper <small style="display:block;opacity:0.72;font-size:11px;font-weight:500;margin-top:2px;">${answers.length} câu hỏi</small>`;
         },
 
         /**
@@ -996,8 +1175,7 @@
         },
 
         /**
-         * Render combined text box with copy button
-         * This allows users to hover with dictionary plugins (like 10ten)
+         * Render a prominent combined answer preview.
          */
         renderCombinedText(questionData) {
             const combined = this.getCombinedText(questionData);
@@ -1008,54 +1186,53 @@
 
             return `
                 <div style="background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                    <span class="nix-combined-text" style="flex: 1; font-size: 16px; font-weight: 500; color: #333; user-select: text; cursor: text;" title="Hover để tra từ điển">${combined}</span>
-                    <button class="nix-copy-combined" data-text="${combined.replace(/"/g, '&quot;')}" style="background: ${borderColor}; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; white-space: nowrap;">📋 Copy</button>
+                    <span class="nix-combined-text" style="flex: 1; font-size: 16px; font-weight: 600; color: #1e293b; user-select: text; cursor: text;" title="Bôi đen để tra từ điển">${combined}</span>
                 </div>
             `;
         },
 
         renderAnswerItem(type, ans) {
             if (type === 3) {
-                return `<div style="background:#fff3cd; padding: 6px 8px; border-left: 3px solid #ffc107; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    <span style="color:#856404;">#${ans.targetIndex}</span> → <strong style="user-select:text;">${ans.content}</strong>
-                    ${ans.reusable ? ' <span style="color:#666;">(Reusable)</span>' : ''}
+                return `<div style="background:#fff7ed; padding: 7px 9px; border-left: 3px solid #f59e0b; margin: 5px 0; border-radius: 5px; font-size: 12px;">
+                    <span style="color:#9a3412;font-weight:700;">#${ans.targetIndex}</span> → <strong style="user-select:text;">${ans.content}</strong>
+                    ${ans.reusable ? ' <span style="color:#64748b;">(Reusable)</span>' : ''}
                 </div>`;
             }
             if (type === 4) {
-                return `<div style="background:#d1ecf1; padding: 6px 8px; border-left: 3px solid #17a2b8; margin: 4px 0; border-radius: 3px; font-size: 12px;">
+                return `<div style="background:#ecfeff; padding: 7px 9px; border-left: 3px solid #0891b2; margin: 5px 0; border-radius: 5px; font-size: 12px;">
                     📍 <strong style="user-select:text;">${ans.content}</strong> at (${ans.coordinates.x}, ${ans.coordinates.y})
                 </div>`;
             }
             if (type === 5) {
-                return `<div style="background:#d4edda; padding: 6px 8px; border-left: 3px solid #28a745; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    <span style="color:#666;">${ans.question}</span> → <strong style="user-select:text;">${ans.answer}</strong>
+                return `<div style="background:#ecfdf5; padding: 7px 9px; border-left: 3px solid #059669; margin: 5px 0; border-radius: 5px; font-size: 12px;">
+                    <span style="color:#475569;">${ans.question}</span> → <strong style="user-select:text;">${ans.answer}</strong>
                 </div>`;
             }
             if (type === 7) {
                 // Dropdown choice shows the correct answer prominently
                 if (ans.type === 'dropdown-choice') {
-                    return `<div style="background:#e2d9f3; padding: 8px 10px; border-left: 3px solid #6f42c1; margin: 4px 0; border-radius: 3px; font-size: 13px;">
+                    return `<div style="background:#f0fdfa; padding: 8px 10px; border-left: 3px solid #0f766e; margin: 5px 0; border-radius: 5px; font-size: 13px;">
                         ✅ <strong style="user-select:text;">${ans.content}</strong>
                     </div>`;
                 }
                 // Regular text fill-in
-                return `<div style="background:#e2d9f3; padding: 6px 8px; border-left: 3px solid #6f42c1; margin: 4px 0; border-radius: 3px; font-size: 12px;">
-                    <span style="color:#666;">[${ans.order}]</span> <strong style="user-select:text;">${ans.content}</strong>
+                return `<div style="background:#f0fdfa; padding: 7px 9px; border-left: 3px solid #0f766e; margin: 5px 0; border-radius: 5px; font-size: 12px;">
+                    <span style="color:#475569;">[${ans.order}]</span> <strong style="user-select:text;">${ans.content}</strong>
                 </div>`;
             }
-            return `<div style="background:#e7f3ff; padding: 6px 8px; border-left: 3px solid #007bff; margin: 4px 0; border-radius: 3px; font-size: 12px;">
+            return `<div style="background:#eff6ff; padding: 7px 9px; border-left: 3px solid #2563eb; margin: 5px 0; border-radius: 5px; font-size: 12px;">
                 ✓ <span style="user-select:text;">${ans.content}</span>
             </div>`;
         },
 
         getTypeColor(type) {
             const colors = {
-                3: '#ffc107',
-                4: '#17a2b8',
-                5: '#28a745',
-                7: '#6f42c1'
+                3: '#f59e0b',
+                4: '#0891b2',
+                5: '#059669',
+                7: '#0f766e'
             };
-            return colors[type] || '#007bff';
+            return colors[type] || '#2563eb';
         },
 
         getTypeIcon(type) {
@@ -1116,9 +1293,20 @@
                 Utils.log('🎯 Quiz response intercepted!');
                 const answers = Parser.parse(responseText);
                 if (answers.length > 0) {
+                    const fingerprint = JSON.stringify(answers);
+                    const isNewResponse = fingerprint !== STATE.lastResponseFingerprint;
+                    STATE.lastResponseFingerprint = fingerprint;
                     STATE.answers = answers;
                     UI.renderAnswers(answers);
-                    Utils.log(`📊 Extracted ${answers.length} questions.`);
+                    UI.updateProgress(
+                        0,
+                        answers.length,
+                        isNewResponse ? 'Đã nhận kết quả mới' : 'Kết quả không thay đổi'
+                    );
+                    Utils.log(`📊 Extracted ${answers.length} questions (${isNewResponse ? 'new' : 'unchanged'}).`);
+                    if (STATE.autoFillEnabled && isNewResponse && !STATE.isAutoCompleting) {
+                        Solver.solve(answers);
+                    }
                 }
             }
         },
@@ -1168,7 +1356,7 @@
         Utils.log('⚠️ Stealth Mode: No global variables exposed.');
         UI.init();
         Network.init();
-        Utils.log('✅ Ready! Open a quiz or use Debug Mode.');
+        Utils.log('✅ Ready! Waiting for quiz answers.');
     }
 
     // Start immediately
