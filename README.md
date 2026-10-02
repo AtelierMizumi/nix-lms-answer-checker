@@ -14,23 +14,74 @@
 
 ## Cài đặt nhanh
 
-### Tampermonkey, khuyến nghị
+### Cách 1: Bookmarklet (Khuyên dùng - Không cần Extension, Không cần Dev Mode)
 
-Tampermonkey là cách cài chính. Script sẽ tự nạp khi mở
-`https://digital.nix.edu.vn` và có thể tự cập nhật từ GitHub.
+Cách nhanh nhất, hoạt động trên mọi trình duyệt (Chrome, Edge, Zen Browser,
+Firefox, Safari) mà **không cần cài extension**, **không cần bật Developer
+Mode**, và hoàn toàn không bị ảnh hưởng bởi Manifest V3:
+
+1. Mở thanh dấu trang trình duyệt (`Ctrl+Shift+B` hoặc `Cmd+Shift+B`).
+2. Tạo một Bookmark mới (hoặc kéo thả một bookmark bất kỳ vào thanh dấu trang
+   rồi chọn **Edit / Chỉnh sửa**).
+3. Đặt tên: `NIX Helper`.
+4. Trong ô **URL**, dán đoạn mã sau:
+
+```javascript
+javascript: (async () => {
+    if (window.__NIX_LMS_HELPER_INITIALIZED__) {
+        if (
+            !document.getElementById('nix-helper-root') &&
+            typeof window.__NIX_LMS_HELPER_REOPEN__ === 'function'
+        ) {
+            window.__NIX_LMS_HELPER_REOPEN__();
+        }
+        return;
+    }
+    try {
+        const r = await fetch(
+            'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js'
+        );
+        const t = await r.text();
+        const s = document.createElement('script');
+        s.textContent = t;
+        document.documentElement.appendChild(s);
+        s.remove();
+    } catch (e) {
+        console.error('NIX Helper failed to load:', e);
+    }
+})();
+```
+
+5. Khi làm quiz trên `https://digital.nix.edu.vn`, chỉ cần **bấm vào bookmark
+   "NIX Helper"** một lần, giao diện sẽ xuất hiện ngay lập tức và tự động cập
+   nhật bản mới nhất từ GitHub.
+
+### Cách 2: Tampermonkey Userscript
+
+Script sẽ tự động nạp mỗi khi mở `https://digital.nix.edu.vn` và có thể tự cập
+nhật từ GitHub. Đã hỗ trợ `@grant none` cùng cơ chế tự động inject Main World,
+tương thích với cả Manifest V2 và Manifest V3 (kể cả khi Firefox chuyển sang
+MV3).
 
 1. Cài [Tampermonkey](https://www.tampermonkey.net/).
-2. Mở trình quản lý Tampermonkey bằng cách bấm biểu tượng extension, sau đó chọn
+2. **Lưu ý trên trình duyệt Chromium (Chrome / Edge):**
+    - **Chrome 138+**: Vào `chrome://extensions` > Tìm Tampermonkey > bấm
+      **Details (Chi tiết)** > Bật công tắc **"Allow User Scripts" (Cho phép tập
+      lệnh người dùng)**. Không cần bật Developer Mode toàn trình duyệt.
+    - **Bản Chrome cũ hơn**: Bật **"Developer mode" (Chế độ cho nhà phát
+      triển)** ở góc trên bên phải của `chrome://extensions`.
+    - **Firefox / Zen Browser**: Không cần thao tác gì thêm.
+3. Mở trình quản lý Tampermonkey bằng cách bấm biểu tượng extension, sau đó chọn
    **Dashboard**.
-3. Mở tab **Utilities**.
-4. Tại mục **Install from URL**, dán URL sau:
+4. Mở tab **Utilities**.
+5. Tại mục **Install from URL**, dán URL sau:
 
 `https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js`
 
-5. Bấm **Install** trong màn hình xác nhận của Tampermonkey.
-6. Quay lại `https://digital.nix.edu.vn` và tải lại trang quiz.
+6. Bấm **Install** trong màn hình xác nhận của Tampermonkey.
+7. Quay lại `https://digital.nix.edu.vn` và tải lại trang quiz.
 
-Domain hiện được hỗ trợ bởi userscript:
+Domain hiện được hỗ trợ:
 
 - `https://digital.nix.edu.vn/*`
 

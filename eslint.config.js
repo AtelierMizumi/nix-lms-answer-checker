@@ -62,7 +62,8 @@ export default [
                 GM_notification: 'readonly',
                 GM_getValue: 'readonly',
                 GM_setValue: 'readonly',
-                GM_xmlhttpRequest: 'readonly'
+                GM_xmlhttpRequest: 'readonly',
+                unsafeWindow: 'readonly'
             }
         },
         rules: {
