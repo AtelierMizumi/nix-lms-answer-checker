@@ -1,9 +1,11 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.2.0-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.3.1-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/platform-Browser-orange?style=for-the-badge" alt="Platform">
   <img src="https://visitor-badge.laobi.icu/badge?page_id=AtelierMizumi.nix-lms-answer-checker" alt="Visitors">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.counterapi.dev%2Fv1%2Fnix-lms-answer-checker%2Fautofill&query=%24.count&label=Autofill%20uses&color=0f766e" alt="Autofill uses">
+  <a href="https://nix-helper-analytics.thuanc177.workers.dev/dashboard" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fnix-helper-analytics.thuanc177.workers.dev%2Fbadge" alt="Use count">
+  </a>
 </p>
 
 <h1 align="center">NIX LMS Answer Helper</h1>
@@ -177,8 +179,8 @@ trực tiếp vào DevTools.
 Script xử lý response và giao diện trong trình duyệt. Runtime không gửi nội dung
 quiz, đáp án, URL câu hỏi hoặc thông tin tài khoản ra ngoài. Mỗi khi một phiên
 autofill thực sự bắt đầu, script gửi một request counter không chứa dữ liệu quiz
-đến CounterAPI để cập nhật badge **Autofill uses** trong README. Nếu dịch vụ này
-không hoạt động, autofill vẫn tiếp tục bình thường.
+đến [Cloudflare Worker & D1 Database](https://nix-helper-analytics.thuanc177.workers.dev/dashboard) để đồng bộ badge **Use count** trong README và giao diện người dùng. Địa chỉ IP được băm (hash SHA-256) cùng secret salt, hoàn toàn không lưu trữ IP thô hay dữ liệu cá nhân. Nếu dịch vụ này
+không hoạt động hoặc mất kết nối, autofill vẫn tiếp tục bình thường.
 
 README cũng tải visitor badge từ `visitor-badge.laobi.icu`; đây là dịch vụ bên
 ngoài của tài liệu, không phải luồng xử lý dữ liệu quiz.
@@ -189,9 +191,11 @@ ngoài của tài liệu, không phải luồng xử lý dữ liệu quiz.
 nix-lms-answer-checker/
 ├── paste-to-console.js       # Runtime canonical cho console và build
 ├── dist/nix-helper.user.js    # Userscript Tampermonkey được build
+├── dist/nix-helper.bookmarklet.js # Bookmarklet loader
 ├── src/parser.js              # Parser được test
 ├── tests/                     # Vitest và fixture
 ├── scripts/build-userscript.mjs
+├── worker/                    # Cloudflare Worker & D1 Analytics Dashboard backend
 ├── package.json
 └── README.md
 ```

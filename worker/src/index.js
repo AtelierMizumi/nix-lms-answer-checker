@@ -554,6 +554,24 @@ export default {
             );
         }
 
+        // 3.1. GET /badge - Shields.io Custom Endpoint format
+        if (request.method === 'GET' && path === '/badge') {
+            const count = await getGlobalCount(env);
+            return jsonResponse(
+                {
+                    schemaVersion: 1,
+                    label: 'Use count',
+                    message: String(count),
+                    color: '0f766e'
+                },
+                200,
+                {
+                    ...corsHeaders,
+                    'Cache-Control': 'public, max-age=15, stale-while-revalidate=30'
+                }
+            );
+        }
+
         // 4. POST /track - Record autofill usage & increment counter
         if (request.method === 'POST' && path === '/track') {
             let body;
