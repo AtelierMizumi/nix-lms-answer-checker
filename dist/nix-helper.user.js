@@ -57,7 +57,7 @@
             UPDATE_URL:
                 'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js',
             DISMISSED_UPDATE_STORAGE_KEY: 'nix-helper-dismissed-update',
-            ANALYTICS_API_BASE: 'https://nix-helper-analytics.ateliermizumi.workers.dev',
+            ANALYTICS_API_BASE: 'https://nix-helper-analytics.thuanc177.workers.dev',
             ANALYTICS_ENDPOINTS: {
                 COUNT: '/count',
                 TRACK: '/track',
