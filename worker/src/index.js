@@ -20,6 +20,9 @@ const MEMORY_STORE = {
 const RATE_LIMIT_WINDOW_MS = 10 * 1000; // 10 seconds per increment
 const MAX_REQUESTS_PER_WINDOW = 2; // Allow small burst (e.g. retry), then throttle
 const BASELINE_COUNT = 403; // Starting counter offset to preserve historical count
+const DEFAULT_LATEST_VERSION = '2.3.0';
+const DEFAULT_UPDATE_URL =
+    'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js';
 
 /**
  * Generates an anonymous salted hash of the client's IP to preserve privacy.
@@ -535,10 +538,20 @@ export default {
         // 3. GET /count - Retrieve current global count
         if (request.method === 'GET' && path === '/count') {
             const count = await getGlobalCount(env);
-            return jsonResponse({ success: true, count }, 200, {
-                ...corsHeaders,
-                'Cache-Control': 'public, max-age=10, stale-while-revalidate=30'
-            });
+            return jsonResponse(
+                {
+                    success: true,
+                    count,
+                    latestVersion: env.LATEST_VERSION || DEFAULT_LATEST_VERSION,
+                    updateUrl: env.UPDATE_URL || DEFAULT_UPDATE_URL,
+                    releaseNotes: env.RELEASE_NOTES || ''
+                },
+                200,
+                {
+                    ...corsHeaders,
+                    'Cache-Control': 'public, max-age=10, stale-while-revalidate=30'
+                }
+            );
         }
 
         // 4. POST /track - Record autofill usage & increment counter
@@ -594,10 +607,38 @@ export default {
             };
 
             const newCount = await recordUsageEvent(env, { event, questions, version }, metadata);
-            return jsonResponse({ success: true, count: newCount }, 200, corsHeaders);
+            return jsonResponse(
+                {
+                    success: true,
+                    count: newCount,
+                    latestVersion: env.LATEST_VERSION || DEFAULT_LATEST_VERSION,
+                    updateUrl: env.UPDATE_URL || DEFAULT_UPDATE_URL,
+                    releaseNotes: env.RELEASE_NOTES || ''
+                },
+                200,
+                corsHeaders
+            );
         }
 
-        // 5. GET /stats - Aggregated stats in JSON
+        // 5. GET /version - Retrieve latest script release info
+        if (request.method === 'GET' && path === '/version') {
+            return jsonResponse(
+                {
+                    success: true,
+                    latestVersion: env.LATEST_VERSION || DEFAULT_LATEST_VERSION,
+                    minRequiredVersion: env.MIN_REQUIRED_VERSION || '2.0.0',
+                    updateUrl: env.UPDATE_URL || DEFAULT_UPDATE_URL,
+                    releaseNotes: env.RELEASE_NOTES || 'Phiên bản mới nhất của NIX Digital LMS Helper.'
+                },
+                200,
+                {
+                    ...corsHeaders,
+                    'Cache-Control': 'public, max-age=60, stale-while-revalidate=120'
+                }
+            );
+        }
+
+        // 6. GET /stats - Aggregated stats in JSON
         if (request.method === 'GET' && path === '/stats') {
             const stats = await getAggregatedStats(env);
             return jsonResponse(stats, 200, {
@@ -606,7 +647,7 @@ export default {
             });
         }
 
-        // 6. GET /dashboard - Aesthetic HTML Dashboard
+        // 7. GET /dashboard - Aesthetic HTML Dashboard
         if (request.method === 'GET' && path === '/dashboard') {
             // Optional dashboard protection key
             if (env.DASHBOARD_SECRET) {

@@ -36,10 +36,15 @@
             AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
             USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-count',
             USAGE_COUNT_START: 403,
+            SCRIPT_VERSION: '2.3.0',
+            UPDATE_URL:
+                'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js',
+            DISMISSED_UPDATE_STORAGE_KEY: 'nix-helper-dismissed-update',
             ANALYTICS_API_BASE: 'https://nix-helper-analytics.ateliermizumi.workers.dev',
             ANALYTICS_ENDPOINTS: {
                 COUNT: '/count',
-                TRACK: '/track'
+                TRACK: '/track',
+                VERSION: '/version'
             },
             SELECTORS: {
                 QUESTION_CONTAINER: '.question-container, .questions', // Generic container
@@ -56,6 +61,7 @@
             uiVisible: true,
             autoFillEnabled: false,
             usageCount: 403,
+            updateInfo: null,
             lastResponseFingerprint: null,
             progress: { current: 0, total: 0, label: 'Sẵn sàng' }
         };
@@ -138,6 +144,43 @@
                 }
             },
 
+            compareSemver(v1, v2) {
+                if (typeof v1 !== 'string' || typeof v2 !== 'string') return 0;
+                const p1 = v1
+                    .replace(/^v/, '')
+                    .split('.')
+                    .map(n => Number.parseInt(n, 10) || 0);
+                const p2 = v2
+                    .replace(/^v/, '')
+                    .split('.')
+                    .map(n => Number.parseInt(n, 10) || 0);
+                for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+                    const num1 = p1[i] || 0;
+                    const num2 = p2[i] || 0;
+                    if (num1 > num2) return 1;
+                    if (num1 < num2) return -1;
+                }
+                return 0;
+            },
+
+            handleVersionCheck(data) {
+                if (!data?.latestVersion) return;
+                if (Utils.compareSemver(data.latestVersion, CONFIG.SCRIPT_VERSION) > 0) {
+                    try {
+                        const dismissed = window.sessionStorage.getItem(CONFIG.DISMISSED_UPDATE_STORAGE_KEY);
+                        if (dismissed === data.latestVersion) return;
+                    } catch (_e) {
+                        /* Ignore restricted storage */
+                    }
+                    STATE.updateInfo = {
+                        version: data.latestVersion,
+                        url: data.updateUrl || CONFIG.UPDATE_URL,
+                        notes: data.releaseNotes || ''
+                    };
+                    UI.showUpdateBanner(STATE.updateInfo);
+                }
+            },
+
             async syncGlobalUsageCount() {
                 if (!CONFIG.ANALYTICS_API_BASE) return;
                 try {
@@ -149,10 +192,13 @@
                     });
                     if (!res.ok) return;
                     const data = await res.json();
-                    if (data?.success && typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
-                        STATE.usageCount = Math.max(STATE.usageCount, data.count);
-                        Utils.saveUsageCount(STATE.usageCount);
-                        UI.updateUsageCount();
+                    if (data?.success) {
+                        if (typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
+                            STATE.usageCount = Math.max(STATE.usageCount, data.count);
+                            Utils.saveUsageCount(STATE.usageCount);
+                            UI.updateUsageCount();
+                        }
+                        Utils.handleVersionCheck(data);
                     }
                 } catch (_e) {
                     // Network or DNS failure must never interrupt the script.
@@ -178,17 +224,20 @@
                         body: JSON.stringify({
                             event: 'autofill',
                             questions: typeof questionCount === 'number' ? questionCount : 0,
-                            version: '2.3.0',
+                            version: CONFIG.SCRIPT_VERSION,
                             timestamp: Date.now()
                         }),
                         keepalive: true
                     })
                     .then(res => (res.ok ? res.json() : null))
                     .then(data => {
-                        if (data?.success && typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
-                            STATE.usageCount = Math.max(STATE.usageCount, data.count);
-                            Utils.saveUsageCount(STATE.usageCount);
-                            UI.updateUsageCount();
+                        if (data?.success) {
+                            if (typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
+                                STATE.usageCount = Math.max(STATE.usageCount, data.count);
+                                Utils.saveUsageCount(STATE.usageCount);
+                                UI.updateUsageCount();
+                            }
+                            Utils.handleVersionCheck(data);
                         }
                     })
                     .catch(() => {
@@ -1146,11 +1195,17 @@
                     const content = div.querySelector('#nix-content');
                     const footer = div.querySelector('#nix-footer');
                     const progress = div.querySelector('#nix-progress');
+                    const updateBanner = div.querySelector('#nix-update-banner');
                     const isHidden = content.style.display === 'none';
                     content.style.display = isHidden ? 'block' : 'none';
                     footer.style.display = isHidden ? 'flex' : 'none';
                     progress.style.display = isHidden ? 'block' : 'none';
+                    if (updateBanner) updateBanner.style.display = isHidden ? 'flex' : 'none';
                 };
+
+                if (STATE.updateInfo) {
+                    this.showUpdateBanner(STATE.updateInfo);
+                }
 
                 div.querySelector('#nix-btn-fill').onclick = () => {
                     if (!STATE.answers.length) {
@@ -1185,6 +1240,69 @@
             updateUsageCount() {
                 const usage = this.root?.querySelector('#nix-usage-count');
                 if (usage) usage.textContent = `Lượt sử dụng: ${STATE.usageCount}`;
+            },
+
+            showUpdateBanner(updateInfo) {
+                if (!this.root || document.getElementById('nix-update-banner')) return;
+                const banner = document.createElement('div');
+                banner.id = 'nix-update-banner';
+                banner.style.cssText = `
+                    background: linear-gradient(135deg, #0f172a, #1e1b4b);
+                    border-bottom: 1px solid rgba(99, 102, 241, 0.4);
+                    color: #e0e7ff;
+                    padding: 8px 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    font-size: 11.5px;
+                `;
+                banner.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <span style="font-size:13px;">🚀</span>
+                        <span>Đã có bản mới <strong>v${updateInfo.version}</strong></span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                        <button id="nix-btn-update-now" style="
+                            background: #4f46e5;
+                            border: 1px solid #6366f1;
+                            color: #fff;
+                            border-radius: 6px;
+                            padding: 3px 8px;
+                            font-size: 11px;
+                            font-weight: 700;
+                            cursor: pointer;
+                        ">Update</button>
+                        <button id="nix-btn-dismiss-update" aria-label="Bỏ qua" title="Đóng thông báo" style="
+                            background: transparent;
+                            border: none;
+                            color: #a5b4fc;
+                            cursor: pointer;
+                            font-size: 14px;
+                            line-height: 1;
+                            padding: 2px 4px;
+                        ">✕</button>
+                    </div>
+                `;
+
+                const header = this.root.querySelector('#nix-header');
+                if (header && header.nextSibling) {
+                    this.root.insertBefore(banner, header.nextSibling);
+                } else {
+                    this.root.prepend(banner);
+                }
+
+                banner.querySelector('#nix-btn-update-now').onclick = () => {
+                    window.open(updateInfo.url, '_blank');
+                };
+
+                banner.querySelector('#nix-btn-dismiss-update').onclick = () => {
+                    try {
+                        window.sessionStorage.setItem(CONFIG.DISMISSED_UPDATE_STORAGE_KEY, updateInfo.version);
+                    } catch (_e) {
+                        /* Ignore restricted storage */
+                    }
+                    banner.remove();
+                };
             },
 
             updateProgress(current, total, label) {

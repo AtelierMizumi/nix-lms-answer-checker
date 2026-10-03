@@ -195,4 +195,16 @@ describe('Cloudflare Worker Telemetry API', () => {
         const authRes = await worker.fetch(authReq, protectedEnv);
         expect(authRes.status).toBe(200);
     });
+
+    it('should return release info on GET /version', async () => {
+        const req = new Request('https://telemetry.local/version', { method: 'GET' });
+        const res = await worker.fetch(req, mockEnv);
+        expect(res.status).toBe(200);
+
+        const data = await res.json();
+        expect(data.success).toBe(true);
+        expect(data).toHaveProperty('latestVersion');
+        expect(data).toHaveProperty('updateUrl');
+        expect(data).toHaveProperty('releaseNotes');
+    });
 });
