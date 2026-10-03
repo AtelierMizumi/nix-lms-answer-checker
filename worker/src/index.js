@@ -101,7 +101,13 @@ async function checkRateLimit(ipHash, env) {
                 }
             } else {
                 await env.DB.prepare(
-                    'INSERT INTO rate_limits (ip_hash, last_request_time, window_count) VALUES (?, ?, 1)'
+                    `
+                    INSERT INTO rate_limits (ip_hash, last_request_time, window_count) 
+                    VALUES (?, ?, 1)
+                    ON CONFLICT(ip_hash) DO UPDATE SET 
+                        last_request_time = excluded.last_request_time,
+                        window_count = 1
+                `
                 )
                     .bind(ipHash, now)
                     .run();
@@ -184,14 +190,15 @@ async function recordUsageEvent(env, payload, metadata) {
                 updatedCount = counterRow.value;
             }
 
-            // Log event
+            // Log event with sanitized User-Agent
+            const sanitizedUserAgent = userAgent.replace(/[^\x20-\x7E]/g, '').slice(0, 150);
             await env.DB.prepare(
                 `
                 INSERT INTO events (event_type, questions_count, version, country, ip_hash, user_agent)
                 VALUES (?, ?, ?, ?, ?, ?)
             `
             )
-                .bind(event, questions, version, country, ipHash, userAgent.slice(0, 150))
+                .bind(event, questions, version, country, ipHash, sanitizedUserAgent)
                 .run();
 
             return updatedCount;

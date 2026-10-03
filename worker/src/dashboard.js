@@ -5,6 +5,16 @@
  * @param {Object} stats
  * @returns {string} HTML string
  */
+function escapeHtml(str) {
+    if (typeof str !== 'string') return String(str ?? '');
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 export function renderDashboard(stats) {
     const {
         totalUsage = 403,
@@ -477,10 +487,10 @@ export function renderDashboard(stats) {
                                               e => `
                                 <tr>
                                     <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">${new Date(e.created_at).toLocaleString('vi-VN')}</td>
-                                    <td><span class="badge badge-event">${e.event_type}</span></td>
-                                    <td><strong style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${e.questions_count || 0}</strong></td>
-                                    <td><span class="badge badge-country">${e.country || 'VN'}</span></td>
-                                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.775rem;">v${e.version || '2.3.0'}</td>
+                                    <td><span class="badge badge-event">${escapeHtml(e.event_type)}</span></td>
+                                    <td><strong style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${Number(e.questions_count) || 0}</strong></td>
+                                    <td><span class="badge badge-country">${escapeHtml(e.country || 'VN')}</span></td>
+                                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.775rem;">v${escapeHtml(e.version || '2.3.0')}</td>
                                 </tr>
                             `
                                           )
@@ -506,8 +516,8 @@ export function renderDashboard(stats) {
                                       .map(
                                           c => `
                             <div class="list-row">
-                                <span class="list-name"><span class="badge badge-country">${c.country}</span> ${c.country === 'VN' ? 'Việt Nam' : c.country}</span>
-                                <span class="list-value">${c.count}</span>
+                                <span class="list-name"><span class="badge badge-country">${escapeHtml(c.country)}</span> ${c.country === 'VN' ? 'Việt Nam' : escapeHtml(c.country)}</span>
+                                <span class="list-value">${Number(c.count).toLocaleString()}</span>
                             </div>
                         `
                                       )
@@ -529,8 +539,8 @@ export function renderDashboard(stats) {
                                       .map(
                                           v => `
                             <div class="list-row">
-                                <span class="list-name">v${v.version}</span>
-                                <span class="list-value">${v.count}</span>
+                                <span class="list-name">v${escapeHtml(v.version)}</span>
+                                <span class="list-value">${Number(v.count).toLocaleString()}</span>
                             </div>
                         `
                                       )

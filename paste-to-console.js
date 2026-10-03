@@ -1070,6 +1070,17 @@
                 this.createOverlay();
                 this.setupDrag();
                 Utils.syncGlobalUsageCount();
+
+                // Cross-tab usage synchronization
+                window.addEventListener('storage', event => {
+                    if (event.key === CONFIG.USAGE_COUNT_STORAGE_KEY && event.newValue) {
+                        const newCount = Number.parseInt(event.newValue, 10);
+                        if (Number.isFinite(newCount) && newCount > STATE.usageCount) {
+                            STATE.usageCount = newCount;
+                            this.updateUsageCount();
+                        }
+                    }
+                });
             },
 
             createOverlay() {
