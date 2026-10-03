@@ -1139,7 +1139,6 @@
                     this.createOverlay();
                 };
                 this.createOverlay();
-                this.setupDrag();
                 Utils.syncGlobalUsageCount();
 
                 // Cross-tab usage synchronization
@@ -1253,6 +1252,8 @@
                         STATE.isAutoCompleting = false;
                     }
                 };
+
+                this.setupDrag();
             },
 
             updateAutoFillToggle() {
@@ -1323,6 +1324,41 @@
 
                 banner.querySelector('#nix-btn-update-now').onclick = () => {
                     window.open(updateInfo.url, '_blank');
+                    banner.style.background = 'linear-gradient(135deg, #064e3b, #047857)';
+                    banner.style.borderBottom = '1px solid rgba(52, 211, 153, 0.4)';
+                    banner.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:6px;flex:1;overflow:hidden;padding-right:6px;">
+                            <span style="font-size:13px;">✅</span>
+                            <span style="line-height:1.25;font-size:11px;">Đã mở trang cài đặt! Cập nhật xong hãy tải lại trang:</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                            <button id="nix-btn-reload-now" style="
+                                background: #10b981;
+                                border: 1px solid #34d399;
+                                color: #fff;
+                                border-radius: 6px;
+                                padding: 3px 8px;
+                                font-size: 11px;
+                                font-weight: 700;
+                                cursor: pointer;
+                            ">Tải lại trang</button>
+                            <button id="nix-btn-dismiss-post" aria-label="Bỏ qua" title="Đóng thông báo" style="
+                                background: transparent;
+                                border: none;
+                                color: #a7f3d0;
+                                cursor: pointer;
+                                font-size: 14px;
+                                line-height: 1;
+                                padding: 2px 4px;
+                            ">✕</button>
+                        </div>
+                    `;
+                    banner.querySelector('#nix-btn-reload-now').onclick = () => {
+                        window.location.reload();
+                    };
+                    banner.querySelector('#nix-btn-dismiss-post').onclick = () => {
+                        banner.remove();
+                    };
                 };
 
                 banner.querySelector('#nix-btn-dismiss-update').onclick = () => {
@@ -1482,37 +1518,81 @@
             },
 
             setupDrag() {
-                const header = this.root.querySelector('#nix-header');
-                let isDragging = false,
-                    startX,
-                    startY,
-                    initLeft,
-                    initTop;
+                const header = this.root?.querySelector('#nix-header');
+                if (!header || !this.root) return;
 
-                header.onmousedown = e => {
-                    if (e.target.tagName === 'BUTTON') return;
+                header.style.userSelect = 'none';
+                header.style.webkitUserSelect = 'none';
+                header.style.touchAction = 'none';
+
+                let isDragging = false;
+                let startX = 0;
+                let startY = 0;
+                let initLeft = 0;
+                let initTop = 0;
+
+                const onPointerDown = e => {
+                    // Ignore clicks on buttons (close, minimize)
+                    if (e.target.closest('button')) return;
+                    e.preventDefault();
+
                     isDragging = true;
                     startX = e.clientX;
                     startY = e.clientY;
+
                     const rect = this.root.getBoundingClientRect();
                     initLeft = rect.left;
                     initTop = rect.top;
+
+                    // Switch positioning from right/bottom to explicit left/top
+                    this.root.style.left = `${initLeft}px`;
+                    this.root.style.top = `${initTop}px`;
+                    this.root.style.right = 'auto';
+                    this.root.style.bottom = 'auto';
+
                     header.style.cursor = 'grabbing';
+                    try {
+                        header.setPointerCapture(e.pointerId);
+                    } catch (_err) {
+                        /* Pointer capture not supported or restricted */
+                    }
                 };
 
-                document.onmousemove = e => {
+                const onPointerMove = e => {
                     if (!isDragging) return;
+                    e.preventDefault();
+
                     const dx = e.clientX - startX;
                     const dy = e.clientY - startY;
-                    this.root.style.left = `${initLeft + dx}px`;
-                    this.root.style.top = `${initTop + dy}px`;
-                    this.root.style.right = 'auto';
+
+                    // Prevent dragging completely off-screen
+                    const pad = 8;
+                    const maxLeft = Math.max(pad, window.innerWidth - this.root.offsetWidth - pad);
+                    const maxTop = Math.max(pad, window.innerHeight - this.root.offsetHeight - pad);
+
+                    const targetLeft = Math.min(Math.max(initLeft + dx, pad), maxLeft);
+                    const targetTop = Math.min(Math.max(initTop + dy, pad), maxTop);
+
+                    this.root.style.left = `${targetLeft}px`;
+                    this.root.style.top = `${targetTop}px`;
                 };
 
-                document.onmouseup = () => {
+                const onPointerUp = e => {
+                    if (!isDragging) return;
                     isDragging = false;
                     header.style.cursor = 'move';
+                    try {
+                        header.releasePointerCapture(e.pointerId);
+                    } catch (_err) {
+                        /* Ignore */
+                    }
                 };
+
+                header.addEventListener('pointerdown', onPointerDown);
+                header.addEventListener('pointermove', onPointerMove);
+                header.addEventListener('pointerup', onPointerUp);
+                header.addEventListener('pointercancel', onPointerUp);
+                header.addEventListener('dragstart', e => e.preventDefault());
             }
         };
 
