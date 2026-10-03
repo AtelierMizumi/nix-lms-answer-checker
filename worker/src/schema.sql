@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS events (
     questions_count INTEGER DEFAULT 0,
     version TEXT DEFAULT '2.3.0',
     country TEXT DEFAULT 'VN',
+    city TEXT DEFAULT '',
+    os TEXT DEFAULT 'Other',
+    browser TEXT DEFAULT 'Other',
     ip_hash TEXT NOT NULL,
     user_agent TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -26,6 +29,9 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
 CREATE INDEX IF NOT EXISTS idx_events_ip_hash ON events(ip_hash, created_at);
 CREATE INDEX IF NOT EXISTS idx_events_country ON events(country);
+CREATE INDEX IF NOT EXISTS idx_events_city ON events(city);
+CREATE INDEX IF NOT EXISTS idx_events_os ON events(os);
+CREATE INDEX IF NOT EXISTS idx_events_browser ON events(browser);
 
 -- 3. Rate limiting table to prevent spam & abuse
 CREATE TABLE IF NOT EXISTS rate_limits (

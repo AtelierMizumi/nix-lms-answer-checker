@@ -133,7 +133,22 @@ describe('Cloudflare Worker Telemetry API', () => {
         expect(data3.error).toContain('Rate limit exceeded');
     });
 
-    it('should return aggregated stats on GET /stats', async () => {
+    it('should return aggregated stats on GET /stats including geo, OS, and browser', async () => {
+        const trackReq = new Request('https://telemetry.local/track', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CF-Connecting-IP': '10.0.0.123',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) coc_coc_browser/120.0 Chrome/120.0'
+            },
+            body: JSON.stringify({
+                event: 'autofill',
+                questions: 8,
+                timestamp: Date.now()
+            })
+        });
+        await worker.fetch(trackReq, mockEnv);
+
         const req = new Request('https://telemetry.local/stats', { method: 'GET' });
         const res = await worker.fetch(req, mockEnv);
         expect(res.status).toBe(200);
@@ -143,6 +158,14 @@ describe('Cloudflare Worker Telemetry API', () => {
         expect(data).toHaveProperty('todayUsage');
         expect(data).toHaveProperty('totalQuestions');
         expect(data).toHaveProperty('activeUsers24h');
+        expect(data).toHaveProperty('topCountries');
+        expect(data).toHaveProperty('topCities');
+        expect(data).toHaveProperty('osStats');
+        expect(data).toHaveProperty('browserStats');
+        expect(data).toHaveProperty('dailyStats');
+        expect(data).toHaveProperty('peakHours');
+        expect(Array.isArray(data.osStats)).toBe(true);
+        expect(Array.isArray(data.browserStats)).toBe(true);
     });
 
     it('should render HTML dashboard on GET /dashboard', async () => {

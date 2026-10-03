@@ -22,7 +22,12 @@ export function renderDashboard(stats) {
         totalQuestions = 0,
         activeUsers24h = 0,
         activeUsers7d = 0,
+        dailyStats = [],
+        peakHours = [],
         topCountries = [],
+        topCities = [],
+        osStats = [],
+        browserStats = [],
         versionStats = [],
         recentEvents = [],
         lastUpdated = new Date().toISOString()
@@ -75,7 +80,7 @@ export function renderDashboard(stats) {
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1240px;
             margin: 0 auto;
         }
 
@@ -278,7 +283,7 @@ export function renderDashboard(stats) {
             margin-bottom: 2rem;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 960px) {
             .content-grid {
                 grid-template-columns: 1fr;
             }
@@ -354,6 +359,24 @@ export function renderDashboard(stats) {
             border: 1px solid rgba(139, 92, 246, 0.3);
         }
 
+        .badge-city {
+            background: rgba(20, 184, 166, 0.15);
+            color: #2dd4bf;
+            border: 1px solid rgba(20, 184, 166, 0.3);
+        }
+
+        .badge-os {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .badge-browser {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
         .list-row {
             display: flex;
             justify-content: space-between;
@@ -381,6 +404,52 @@ export function renderDashboard(stats) {
             color: var(--text-primary);
         }
 
+        .side-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Peak Hours Bar Chart */
+        .hours-grid {
+            display: grid;
+            grid-template-columns: repeat(24, 1fr);
+            gap: 2px;
+            align-items: end;
+            height: 90px;
+            padding: 0.75rem 0.25rem 0.25rem;
+            margin-top: 0.5rem;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+        }
+
+        .hour-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .hour-bar {
+            width: 100%;
+            background: linear-gradient(180deg, #0ea5e9, #0f766e);
+            border-radius: 3px 3px 0 0;
+            min-height: 4px;
+            transition: height 0.3s ease;
+        }
+
+        .hour-bar:hover {
+            background: #38bdf8;
+        }
+
+        .hour-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 0.4rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         footer {
             text-align: center;
             padding-top: 2rem;
@@ -406,7 +475,7 @@ export function renderDashboard(stats) {
                 <div class="brand-icon">N</div>
                 <div class="brand-text">
                     <h1>NIX Helper Analytics</h1>
-                    <p>Edge Telemetry & Global Usage Tracker</p>
+                    <p>Edge Telemetry & Comprehensive Usage Tracker</p>
                 </div>
             </div>
             <div class="header-meta">
@@ -429,7 +498,7 @@ export function renderDashboard(stats) {
                     <span class="card-icon">⚡</span>
                 </div>
                 <div class="card-value">${Number(totalUsage).toLocaleString()}</div>
-                <div class="card-subtext">Được đồng bộ real-time với userscript</div>
+                <div class="card-subtext">Đồng bộ tức thời với popup userscript</div>
             </div>
 
             <div class="card glow-emerald">
@@ -438,7 +507,7 @@ export function renderDashboard(stats) {
                     <span class="card-icon">📈</span>
                 </div>
                 <div class="card-value">${Number(todayUsage).toLocaleString()}</div>
-                <div class="card-subtext">Phiên giải quiz trong ngày hôm nay</div>
+                <div class="card-subtext">Phiên giải quiz diễn ra trong ngày</div>
             </div>
 
             <div class="card glow-purple">
@@ -447,7 +516,7 @@ export function renderDashboard(stats) {
                     <span class="card-icon">👥</span>
                 </div>
                 <div class="card-value">${Number(activeUsers24h).toLocaleString()} <span style="font-size: 1.25rem; font-weight: 500; color: var(--text-muted);">/ ${Number(activeUsers7d).toLocaleString()}</span></div>
-                <div class="card-subtext">Số người dùng ẩn danh hoạt động</div>
+                <div class="card-subtext">Người dùng ẩn danh duy nhất</div>
             </div>
 
             <div class="card glow-amber">
@@ -456,68 +525,214 @@ export function renderDashboard(stats) {
                     <span class="card-icon">🎯</span>
                 </div>
                 <div class="card-value">${Number(totalQuestions).toLocaleString()}</div>
-                <div class="card-subtext">Tổng số câu hỏi được tự động điền</div>
+                <div class="card-subtext">Tổng số câu hỏi được tự động hoàn thành</div>
             </div>
         </div>
 
-        <!-- Tables & Breakdowns -->
+        <!-- Main Content Grid -->
         <div class="content-grid">
-            <!-- Recent Events -->
-            <div class="card">
-                <h2 class="section-title">
-                    <span>🕒</span> Lịch sử hoạt động gần đây
-                </h2>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Thời gian</th>
-                                <th>Sự kiện</th>
-                                <th>Số câu</th>
-                                <th>Quốc gia</th>
-                                <th>Phiên bản</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${
-                                recentEvents.length === 0
-                                    ? '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">Chưa có sự kiện nào được ghi nhận</td></tr>'
-                                    : recentEvents
-                                          .map(
-                                              e => `
+            <!-- Left Column: Recent Events & Daily Timeline -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Recent Events Table -->
+                <div class="card">
+                    <h2 class="section-title">
+                        <span>🕒</span> Lịch sử hoạt động gần đây
+                    </h2>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
                                 <tr>
-                                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">${new Date(e.created_at).toLocaleString('vi-VN')}</td>
-                                    <td><span class="badge badge-event">${escapeHtml(e.event_type)}</span></td>
-                                    <td><strong style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${Number(e.questions_count) || 0}</strong></td>
-                                    <td><span class="badge badge-country">${escapeHtml(e.country || 'VN')}</span></td>
-                                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.775rem;">v${escapeHtml(e.version || '2.3.0')}</td>
+                                    <th>Thời gian</th>
+                                    <th>Sự kiện</th>
+                                    <th>Số câu</th>
+                                    <th>Vị trí</th>
+                                    <th>Môi trường</th>
+                                    <th>Phiên bản</th>
                                 </tr>
+                            </thead>
+                            <tbody>
+                                ${
+                                    recentEvents.length === 0
+                                        ? '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Chưa có sự kiện nào được ghi nhận</td></tr>'
+                                        : recentEvents
+                                              .map(
+                                                  e => `
+                                    <tr>
+                                        <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">${new Date(e.created_at).toLocaleString('vi-VN')}</td>
+                                        <td><span class="badge badge-event">${escapeHtml(e.event_type)}</span></td>
+                                        <td><strong style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${Number(e.questions_count) || 0}</strong></td>
+                                        <td>
+                                            <span class="badge badge-country">${escapeHtml(e.country || 'VN')}</span>
+                                            ${e.city && e.city !== 'Unknown' ? `<span class="badge badge-city" style="margin-left: 4px;">${escapeHtml(e.city)}</span>` : ''}
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-os">${escapeHtml(e.os || 'Other')}</span>
+                                            <span class="badge badge-browser" style="margin-left: 4px;">${escapeHtml(e.browser || 'Other')}</span>
+                                        </td>
+                                        <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.775rem;">v${escapeHtml(e.version || '2.3.0')}</td>
+                                    </tr>
+                                `
+                                              )
+                                              .join('')
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Daily Usage Timeline -->
+                <div class="card">
+                    <h2 class="section-title">
+                        <span>📅</span> Thống kê 7 ngày gần nhất
+                    </h2>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ngày (UTC)</th>
+                                    <th>Lượt sử dụng</th>
+                                    <th>Số câu hỏi đã điền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${
+                                    dailyStats.length === 0
+                                        ? '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Chưa có dữ liệu thống kê theo ngày</td></tr>'
+                                        : dailyStats
+                                              .map(
+                                                  d => `
+                                    <tr>
+                                        <td style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">${escapeHtml(d.date)}</td>
+                                        <td><strong style="color: var(--primary); font-family: 'JetBrains Mono', monospace;">${Number(d.count).toLocaleString()}</strong></td>
+                                        <td style="font-family: 'JetBrains Mono', monospace;">${Number(d.questions || 0).toLocaleString()} câu</td>
+                                    </tr>
+                                `
+                                              )
+                                              .join('')
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Peak Hours Breakdown -->
+                ${
+                    peakHours.length > 0
+                        ? `
+                <div class="card">
+                    <h2 class="section-title">
+                        <span>⏰</span> Khung giờ hoạt động cao điểm (24h)
+                    </h2>
+                    <div class="hours-grid">
+                        ${Array.from({ length: 24 })
+                            .map((_, i) => {
+                                const hStr = i.toString().padStart(2, '0');
+                                const found = peakHours.find(p => p.hour === hStr);
+                                const count = found ? found.count : 0;
+                                const maxCount = Math.max(...peakHours.map(p => p.count), 1);
+                                const heightPct = Math.max(6, Math.round((count / maxCount) * 100));
+                                return `
+                                <div class="hour-col" title="${hStr}:00 UTC - ${count} lượt">
+                                    <div class="hour-bar" style="height: ${heightPct}%;"></div>
+                                    <span class="hour-label">${i % 4 === 0 ? hStr : ''}</span>
+                                </div>
+                            `;
+                            })
+                            .join('')}
+                    </div>
+                    <p style="font-size: 0.725rem; color: var(--text-muted); margin-top: 0.6rem; text-align: center;">Múi giờ máy chủ UTC (Giờ VN = UTC + 7)</p>
+                </div>
+                `
+                        : ''
+                }
+            </div>
+
+            <!-- Right Column: Geo, OS, Browser, Version -->
+            <div class="side-stack">
+                <!-- Geo Location: Cities & Countries -->
+                <div class="card">
+                    <h2 class="section-title">
+                        <span>📍</span> Vị trí địa lý (Geo-Location)
+                    </h2>
+                    <div style="margin-bottom: 1rem;">
+                        <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Thành phố phổ biến</span>
+                        <div style="margin-top: 0.5rem;">
+                            ${
+                                topCities.length === 0
+                                    ? '<p style="color: var(--text-muted); font-size: 0.825rem;">Chưa có dữ liệu thành phố</p>'
+                                    : topCities
+                                          .map(
+                                              c => `
+                                <div class="list-row">
+                                    <span class="list-name"><span class="badge badge-city">${escapeHtml(c.city)}</span> ${escapeHtml(c.country)}</span>
+                                    <span class="list-value">${Number(c.count).toLocaleString()}</span>
+                                </div>
                             `
                                           )
                                           .join('')
                             }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                        </div>
+                    </div>
 
-            <!-- Side Panels: Country & Version -->
-            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                <!-- Countries -->
+                    <div>
+                        <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Quốc gia</span>
+                        <div style="margin-top: 0.5rem;">
+                            ${
+                                topCountries.length === 0
+                                    ? '<p style="color: var(--text-muted); font-size: 0.825rem;">Chưa có dữ liệu quốc gia</p>'
+                                    : topCountries
+                                          .map(
+                                              c => `
+                                <div class="list-row">
+                                    <span class="list-name"><span class="badge badge-country">${escapeHtml(c.country)}</span> ${c.country === 'VN' ? 'Việt Nam' : escapeHtml(c.country)}</span>
+                                    <span class="list-value">${Number(c.count).toLocaleString()}</span>
+                                </div>
+                            `
+                                          )
+                                          .join('')
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operating System -->
                 <div class="card">
                     <h2 class="section-title">
-                        <span>🌍</span> Quốc gia hàng đầu
+                        <span>💻</span> Hệ điều hành (OS)
                     </h2>
                     <div>
                         ${
-                            topCountries.length === 0
-                                ? '<p style="color: var(--text-muted); font-size: 0.825rem;">Chưa có dữ liệu quốc gia</p>'
-                                : topCountries
+                            osStats.length === 0
+                                ? '<p style="color: var(--text-muted); font-size: 0.825rem;">Chưa có dữ liệu hệ điều hành</p>'
+                                : osStats
                                       .map(
-                                          c => `
+                                          o => `
                             <div class="list-row">
-                                <span class="list-name"><span class="badge badge-country">${escapeHtml(c.country)}</span> ${c.country === 'VN' ? 'Việt Nam' : escapeHtml(c.country)}</span>
-                                <span class="list-value">${Number(c.count).toLocaleString()}</span>
+                                <span class="list-name"><span class="badge badge-os">${escapeHtml(o.os)}</span></span>
+                                <span class="list-value">${Number(o.count).toLocaleString()}</span>
+                            </div>
+                        `
+                                      )
+                                      .join('')
+                        }
+                    </div>
+                </div>
+
+                <!-- Browsers -->
+                <div class="card">
+                    <h2 class="section-title">
+                        <span>🌐</span> Trình duyệt
+                    </h2>
+                    <div>
+                        ${
+                            browserStats.length === 0
+                                ? '<p style="color: var(--text-muted); font-size: 0.825rem;">Chưa có dữ liệu trình duyệt</p>'
+                                : browserStats
+                                      .map(
+                                          b => `
+                            <div class="list-row">
+                                <span class="list-name"><span class="badge badge-browser">${escapeHtml(b.browser)}</span></span>
+                                <span class="list-value">${Number(b.count).toLocaleString()}</span>
                             </div>
                         `
                                       )
@@ -529,7 +744,7 @@ export function renderDashboard(stats) {
                 <!-- Versions -->
                 <div class="card">
                     <h2 class="section-title">
-                        <span>📦</span> Phiên bản Userscript
+                        <span>📦</span> Phiên bản Script
                     </h2>
                     <div>
                         ${

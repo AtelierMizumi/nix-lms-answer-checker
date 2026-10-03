@@ -37,6 +37,56 @@ async function hashIp(clientIp, salt = 'nix-telemetry-salt-2026') {
 }
 
 /**
+ * Parse client User-Agent into standardized OS and Browser families
+ */
+function parseUserAgent(ua = '') {
+    const s = ua.toLowerCase();
+
+    // 1. Detect Operating System
+    let os = 'Other';
+    if (
+        s.includes('windows nt 10') ||
+        s.includes('windows nt 11') ||
+        s.includes('windows 10') ||
+        s.includes('windows 11')
+    ) {
+        os = 'Windows 10/11';
+    } else if (s.includes('windows nt 6.3') || s.includes('windows nt 6.2') || s.includes('windows nt 6.1')) {
+        os = 'Windows 7/8';
+    } else if (s.includes('windows')) {
+        os = 'Windows';
+    } else if (s.includes('android')) {
+        os = 'Android';
+    } else if (s.includes('iphone') || s.includes('ipad') || s.includes('ipod')) {
+        os = 'iOS';
+    } else if (s.includes('macintosh') || s.includes('mac os x')) {
+        os = 'macOS';
+    } else if (s.includes('cros')) {
+        os = 'ChromeOS';
+    } else if (s.includes('linux')) {
+        os = 'Linux';
+    }
+
+    // 2. Detect Browser Family (Order is important because Chromium UAs contain multiple tokens)
+    let browser = 'Other';
+    if (s.includes('coc_coc_browser') || s.includes('coc_coc')) {
+        browser = 'Cốc Cốc';
+    } else if (s.includes('edg/') || s.includes('edge/')) {
+        browser = 'Edge';
+    } else if (s.includes('opr/') || s.includes('opera')) {
+        browser = 'Opera';
+    } else if (s.includes('firefox') || s.includes('fxios')) {
+        browser = 'Firefox';
+    } else if (s.includes('chrome') || s.includes('crios')) {
+        browser = 'Chrome';
+    } else if (s.includes('safari') && !s.includes('chrome')) {
+        browser = 'Safari';
+    }
+
+    return { os, browser };
+}
+
+/**
  * Standard CORS headers
  */
 function getCorsHeaders(request, _env) {
@@ -163,7 +213,8 @@ async function getGlobalCount(env) {
  */
 async function recordUsageEvent(env, payload, metadata) {
     const { event = 'autofill', questions = 0, version = '2.3.0' } = payload;
-    const { country = 'VN', ipHash = 'unknown', userAgent = '' } = metadata;
+    const { country = 'VN', city = 'Unknown', ipHash = 'unknown', userAgent = '' } = metadata;
+    const { os, browser } = parseUserAgent(userAgent);
 
     let updatedCount = BASELINE_COUNT;
 
@@ -190,16 +241,28 @@ async function recordUsageEvent(env, payload, metadata) {
                 updatedCount = counterRow.value;
             }
 
-            // Log event with sanitized User-Agent
+            // Log event with sanitized User-Agent, city, os, and browser
             const sanitizedUserAgent = userAgent.replace(/[^\x20-\x7E]/g, '').slice(0, 150);
-            await env.DB.prepare(
+            try {
+                await env.DB.prepare(
+                    `
+                    INSERT INTO events (event_type, questions_count, version, country, city, os, browser, ip_hash, user_agent)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `
-                INSERT INTO events (event_type, questions_count, version, country, ip_hash, user_agent)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `
-            )
-                .bind(event, questions, version, country, ipHash, sanitizedUserAgent)
-                .run();
+                )
+                    .bind(event, questions, version, country, city, os, browser, ipHash, sanitizedUserAgent)
+                    .run();
+            } catch (_err) {
+                // Fallback for tables without new columns
+                await env.DB.prepare(
+                    `
+                    INSERT INTO events (event_type, questions_count, version, country, ip_hash, user_agent)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `
+                )
+                    .bind(event, questions, version, country, ipHash, sanitizedUserAgent)
+                    .run();
+            }
 
             return updatedCount;
         } catch (e) {
@@ -220,6 +283,9 @@ async function recordUsageEvent(env, payload, metadata) {
         questions_count: questions,
         version,
         country,
+        city,
+        os,
+        browser,
         ip_hash: ipHash,
         created_at: new Date().toISOString()
     });
@@ -235,7 +301,12 @@ async function getAggregatedStats(env) {
     let totalQuestions = 0;
     let activeUsers24h = 0;
     let activeUsers7d = 0;
+    let dailyStats = [];
+    let peakHours = [];
     let topCountries = [];
+    let topCities = [];
+    let osStats = [];
+    let browserStats = [];
     let versionStats = [];
     let recentEvents = [];
 
@@ -263,11 +334,83 @@ async function getAggregatedStats(env) {
             ).first();
             activeUsers7d = u7dRow?.active || 0;
 
+            // Daily usage last 7 days
+            try {
+                const dayRows = await env.DB.prepare(
+                    `SELECT date(created_at) as date, COUNT(*) as count, SUM(questions_count) as questions
+                     FROM events
+                     WHERE created_at >= date('now', '-7 days')
+                     GROUP BY date(created_at)
+                     ORDER BY date(created_at) DESC`
+                ).all();
+                dailyStats = dayRows.results || [];
+            } catch (_e) {
+                // Table without index or empty
+            }
+
+            // Peak hours (24h)
+            try {
+                const hourRows = await env.DB.prepare(
+                    `SELECT strftime('%H', created_at) as hour, COUNT(*) as count
+                     FROM events
+                     GROUP BY hour
+                     ORDER BY hour ASC`
+                ).all();
+                peakHours = hourRows.results || [];
+            } catch (_e) {
+                // Query error fallback
+            }
+
             // Top countries
             const cRows = await env.DB.prepare(
                 'SELECT country, COUNT(*) as count FROM events GROUP BY country ORDER BY count DESC LIMIT 5'
             ).all();
             topCountries = cRows.results || [];
+
+            // Top cities
+            try {
+                const cityRows = await env.DB.prepare(
+                    `SELECT city, country, COUNT(*) as count
+                     FROM events
+                     WHERE city IS NOT NULL AND city != '' AND city != 'Unknown'
+                     GROUP BY city, country
+                     ORDER BY count DESC
+                     LIMIT 8`
+                ).all();
+                topCities = cityRows.results || [];
+            } catch (_e) {
+                // Legacy table fallback
+            }
+
+            // OS distribution
+            try {
+                const osRows = await env.DB.prepare(
+                    `SELECT os, COUNT(*) as count
+                     FROM events
+                     WHERE os IS NOT NULL AND os != ''
+                     GROUP BY os
+                     ORDER BY count DESC
+                     LIMIT 6`
+                ).all();
+                osStats = osRows.results || [];
+            } catch (_e) {
+                // Legacy table fallback
+            }
+
+            // Browser distribution
+            try {
+                const bRows = await env.DB.prepare(
+                    `SELECT browser, COUNT(*) as count
+                     FROM events
+                     WHERE browser IS NOT NULL AND browser != ''
+                     GROUP BY browser
+                     ORDER BY count DESC
+                     LIMIT 6`
+                ).all();
+                browserStats = bRows.results || [];
+            } catch (_e) {
+                // Legacy table fallback
+            }
 
             // Version distribution
             const vRows = await env.DB.prepare(
@@ -276,10 +419,20 @@ async function getAggregatedStats(env) {
             versionStats = vRows.results || [];
 
             // Recent 10 events
-            const eRows = await env.DB.prepare(
-                'SELECT event_type, questions_count, version, country, created_at FROM events ORDER BY id DESC LIMIT 10'
-            ).all();
-            recentEvents = eRows.results || [];
+            try {
+                const eRows = await env.DB.prepare(
+                    `SELECT event_type, questions_count, version, country, city, os, browser, created_at
+                     FROM events
+                     ORDER BY id DESC
+                     LIMIT 10`
+                ).all();
+                recentEvents = eRows.results || [];
+            } catch (_e) {
+                const eRows = await env.DB.prepare(
+                    'SELECT event_type, questions_count, version, country, created_at FROM events ORDER BY id DESC LIMIT 10'
+                ).all();
+                recentEvents = eRows.results || [];
+            }
         } catch (err) {
             console.error('[AggregatedStats] D1 query error:', err);
         }
@@ -287,6 +440,52 @@ async function getAggregatedStats(env) {
         // In-memory calculations
         totalQuestions = MEMORY_STORE.events.reduce((sum, e) => sum + (e.questions_count || 0), 0);
         recentEvents = MEMORY_STORE.events.slice(-10).reverse();
+
+        const countryMap = new Map();
+        const cityMap = new Map();
+        const osMap = new Map();
+        const browserMap = new Map();
+        const verMap = new Map();
+        const hourMap = new Map();
+        const dayMap = new Map();
+
+        for (const e of MEMORY_STORE.events) {
+            const country = e.country || 'VN';
+            countryMap.set(country, (countryMap.get(country) || 0) + 1);
+
+            if (e.city && e.city !== 'Unknown') {
+                const cityKey = `${e.city}, ${country}`;
+                cityMap.set(cityKey, (cityMap.get(cityKey) || 0) + 1);
+            }
+
+            const os = e.os || 'Other';
+            osMap.set(os, (osMap.get(os) || 0) + 1);
+
+            const browser = e.browser || 'Other';
+            browserMap.set(browser, (browserMap.get(browser) || 0) + 1);
+
+            const ver = e.version || '2.3.0';
+            verMap.set(ver, (verMap.get(ver) || 0) + 1);
+
+            const dateStr = new Date(e.created_at).toISOString().split('T')[0];
+            const currentDay = dayMap.get(dateStr) || { count: 0, questions: 0 };
+            currentDay.count += 1;
+            currentDay.questions += e.questions_count || 0;
+            dayMap.set(dateStr, currentDay);
+
+            const hour = new Date(e.created_at).getUTCHours().toString().padStart(2, '0');
+            hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
+        }
+
+        topCountries = Array.from(countryMap.entries()).map(([country, count]) => ({ country, count }));
+        topCities = Array.from(cityMap.entries()).map(([city, count]) => ({ city, count }));
+        osStats = Array.from(osMap.entries()).map(([os, count]) => ({ os, count }));
+        browserStats = Array.from(browserMap.entries()).map(([browser, count]) => ({ browser, count }));
+        versionStats = Array.from(verMap.entries()).map(([version, count]) => ({ version, count }));
+        dailyStats = Array.from(dayMap.entries()).map(([date, data]) => ({ date, ...data }));
+        peakHours = Array.from(hourMap.entries())
+            .map(([hour, count]) => ({ hour, count }))
+            .sort((a, b) => a.hour.localeCompare(b.hour));
     }
 
     return {
@@ -295,7 +494,12 @@ async function getAggregatedStats(env) {
         totalQuestions,
         activeUsers24h,
         activeUsers7d,
+        dailyStats,
+        peakHours,
         topCountries,
+        topCities,
+        osStats,
+        browserStats,
         versionStats,
         recentEvents,
         lastUpdated: new Date().toISOString()
@@ -384,6 +588,7 @@ export default {
 
             const metadata = {
                 country: request.cf?.country || 'VN',
+                city: request.cf?.city || 'Unknown',
                 ipHash,
                 userAgent: request.headers.get('User-Agent') || 'Unknown'
             };
