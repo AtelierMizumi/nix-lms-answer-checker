@@ -1,0 +1,17 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "nix-helper-analytics",
+    "main": "src/index.js",
+    "compatibility_date": "2026-10-01",
+    "compatibility_flags": ["nodejs_compat"],
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "nix-helper-db",
+            "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+        }
+    ],
+    "vars": {
+        "SALT": "nix-helper-secure-telemetry-salt-2026"
+    }
+}

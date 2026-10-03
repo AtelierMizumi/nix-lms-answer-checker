@@ -5,8 +5,8 @@
     "main": "paste-to-console.js",
     "type": "module",
     "scripts": {
-        "lint": "eslint src/ scripts/ paste-to-console.js",
-        "lint:fix": "eslint src/ scripts/ paste-to-console.js --fix",
+        "lint": "eslint src/ scripts/ paste-to-console.js worker/src/",
+        "lint:fix": "eslint src/ scripts/ paste-to-console.js worker/src/ --fix",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",

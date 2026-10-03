@@ -4,16 +4,22 @@ export default [
     js.configs.recommended,
     // Config for ES module files (parser.js)
     {
-        files: ['src/parser.js', 'tests/**/*.js', 'vitest.config.js', 'eslint.config.js'],
+        files: ['src/parser.js', 'tests/**/*.js', 'vitest.config.js', 'eslint.config.js', 'worker/src/**/*.js'],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType: 'module',
             globals: {
-                // Browser globals
+                // Browser and Edge worker globals
                 window: 'readonly',
                 document: 'readonly',
                 console: 'readonly',
-                Promise: 'readonly'
+                Promise: 'readonly',
+                Response: 'readonly',
+                Request: 'readonly',
+                URL: 'readonly',
+                crypto: 'readonly',
+                TextEncoder: 'readonly',
+                Uint8Array: 'readonly'
             }
         },
         rules: {
