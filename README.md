@@ -111,10 +111,19 @@ Trạng thái toggle được lưu trong trình duyệt bằng `localStorage`, n
 của bạn vẫn được giữ sau khi tải lại trang. Khi tắt, script chỉ hiển thị đáp án
 và không tự thay đổi form quiz.
 
-Popup cũng hiển thị bộ đếm lượt sử dụng. Bộ đếm bắt đầu từ `403` và được tăng
-mỗi khi một phiên điền đáp án thực sự bắt đầu, dù được kích hoạt tự động hay
-bằng nút **Điền đáp án ngay**. Đây là bộ đếm cục bộ trên thiết bị của bạn, không
-phải số liệu global trên GitHub và không gửi dữ liệu quiz ra ngoài.
+Popup hiển thị bộ đếm tổng lượt sử dụng thực tế của cộng đồng NIX Helper. Số đếm
+được đồng bộ trực tiếp từ Cloudflare Edge Telemetry API (bắt đầu từ mốc `403` để
+kế thừa lịch sử). Mỗi khi một phiên điền đáp án thực sự bắt đầu, dù được kích
+hoạt tự động hay bằng nút **Điền đáp án ngay**, bộ đếm sẽ được tăng và ghi nhận
+thống kê ẩn danh. Nếu mất mạng hoặc server không phản hồi, script sẽ tự động
+chuyển sang bộ đếm cục bộ mà không bao giờ làm gián đoạn việc điền bài.
+
+Telemetry tuân thủ nghiêm ngặt quyền riêng tư:
+
+- Không lưu địa chỉ IP thật (được băm bằng SHA-256 kèm salt bảo mật).
+- Không gửi câu hỏi, đáp án hay bất kỳ thông tin sinh viên nào ra ngoài.
+- Chi tiết hạ tầng Cloudflare Worker và D1 Database xem tại
+  [worker/README.md](worker/README.md).
 
 Các loại câu hỏi hiện có logic xử lý gồm Type 3 drag-order, Type 4
 drag-position, Type 5 matching, Type 7 fill-blank và các câu hỏi lựa chọn thông

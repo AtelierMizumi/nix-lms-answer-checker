@@ -53,7 +53,11 @@
             AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
             USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-count',
             USAGE_COUNT_START: 403,
-            USAGE_ANALYTICS_URL: 'https://api.counterapi.dev/v1/nix-lms-answer-checker/autofill/up',
+            ANALYTICS_API_BASE: 'https://nix-helper-analytics.ateliermizumi.workers.dev',
+            ANALYTICS_ENDPOINTS: {
+                COUNT: '/count',
+                TRACK: '/track'
+            },
             SELECTORS: {
                 QUESTION_CONTAINER: '.question-container, .questions', // Generic container
                 // Type 3 - actual DOM selectors from Nix LMS
@@ -142,23 +146,67 @@
                 }
             },
 
-            incrementUsageCount() {
-                const nextCount = Utils.loadUsageCount() + 1;
+            saveUsageCount(count) {
+                if (!Number.isFinite(count)) return;
                 try {
-                    window.localStorage.setItem(CONFIG.USAGE_COUNT_STORAGE_KEY, String(nextCount));
+                    window.localStorage.setItem(CONFIG.USAGE_COUNT_STORAGE_KEY, String(count));
                 } catch (_e) {
                     /* Storage can be unavailable in restricted browser contexts. */
                 }
-                return nextCount;
             },
 
-            trackUsage() {
-                window
-                    .fetch(CONFIG.USAGE_ANALYTICS_URL, {
+            async syncGlobalUsageCount() {
+                if (!CONFIG.ANALYTICS_API_BASE) return;
+                try {
+                    const url = `${CONFIG.ANALYTICS_API_BASE}${CONFIG.ANALYTICS_ENDPOINTS.COUNT}`;
+                    const res = await window.fetch(url, {
                         method: 'GET',
                         mode: 'cors',
+                        credentials: 'omit'
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (data?.success && typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
+                        STATE.usageCount = Math.max(STATE.usageCount, data.count);
+                        Utils.saveUsageCount(STATE.usageCount);
+                        UI.updateUsageCount();
+                    }
+                } catch (_e) {
+                    // Network or DNS failure must never interrupt the script.
+                }
+            },
+
+            recordUsage(questionCount = 0) {
+                // Optimistic local update
+                STATE.usageCount += 1;
+                Utils.saveUsageCount(STATE.usageCount);
+                UI.updateUsageCount();
+
+                if (!CONFIG.ANALYTICS_API_BASE) return;
+
+                window
+                    .fetch(`${CONFIG.ANALYTICS_API_BASE}${CONFIG.ANALYTICS_ENDPOINTS.TRACK}`, {
+                        method: 'POST',
+                        mode: 'cors',
                         credentials: 'omit',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            event: 'autofill',
+                            questions: typeof questionCount === 'number' ? questionCount : 0,
+                            version: '2.3.0',
+                            timestamp: Date.now()
+                        }),
                         keepalive: true
+                    })
+                    .then(res => (res.ok ? res.json() : null))
+                    .then(data => {
+                        if (data?.success && typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
+                            STATE.usageCount = Math.max(STATE.usageCount, data.count);
+                            Utils.saveUsageCount(STATE.usageCount);
+                            UI.updateUsageCount();
+                        }
                     })
                     .catch(() => {
                         // Analytics failure must never interrupt answer filling.
@@ -397,9 +445,7 @@
         const Solver = {
             async solve(answers) {
                 if (STATE.isAutoCompleting || !answers.length) return;
-                STATE.usageCount = Utils.incrementUsageCount();
-                UI.updateUsageCount();
-                Utils.trackUsage();
+                Utils.recordUsage(answers.length);
                 Utils.log('🚀 Starting Auto-fill...');
                 STATE.isAutoCompleting = true;
                 UI.updateProgress(0, answers.length, 'Đang chuẩn bị...');
@@ -1040,6 +1086,7 @@
                 };
                 this.createOverlay();
                 this.setupDrag();
+                Utils.syncGlobalUsageCount();
             },
 
             createOverlay() {
@@ -1092,7 +1139,7 @@
                             <span id="nix-toggle-knob" style="position:absolute;width:20px;height:20px;left:${STATE.autoFillEnabled ? '23px' : '3px'};top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:left .2s;"></span>
                         </label>
                     </div>
-                    <small id="nix-usage-count" style="color:#94a3b8;text-align:center;">Lượt sử dụng: ${STATE.usageCount}</small>
+                    <small id="nix-usage-count" title="Tổng lượt giải bài quiz được đồng bộ thời gian thực" style="color:#94a3b8;text-align:center;">Lượt sử dụng: ${STATE.usageCount}</small>
                 </div>
             `;
 
