@@ -17,7 +17,7 @@ function escapeHtml(str) {
 
 export function renderDashboard(stats) {
     const {
-        totalUsage = 403,
+        totalUsage = 0,
         todayUsage = 0,
         totalQuestions = 0,
         activeUsers24h = 0,

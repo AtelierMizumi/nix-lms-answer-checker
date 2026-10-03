@@ -12,14 +12,14 @@ import { renderDashboard } from './dashboard.js';
 
 // In-memory fallback if D1 or KV are not yet bound (e.g. testing)
 const MEMORY_STORE = {
-    counter: 403,
+    counter: 0,
     events: [],
     rateLimits: new Map()
 };
 
 const RATE_LIMIT_WINDOW_MS = 10 * 1000; // 10 seconds per increment
 const MAX_REQUESTS_PER_WINDOW = 2; // Allow small burst (e.g. retry), then throttle
-const BASELINE_COUNT = 403; // Starting counter offset to preserve historical count
+const BASELINE_COUNT = 0; // Baseline counter offset
 const DEFAULT_LATEST_VERSION = '2.3.0';
 const DEFAULT_UPDATE_URL =
     'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js';

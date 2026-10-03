@@ -35,7 +35,7 @@
             AUTO_FILL_DELAY: 0,
             AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
             USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-count',
-            USAGE_COUNT_START: 403,
+            USAGE_COUNT_START: 0,
             SCRIPT_VERSION: '2.3.0',
             UPDATE_URL:
                 'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js',

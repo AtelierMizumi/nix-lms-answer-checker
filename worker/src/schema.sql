@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS counters (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Initialize autofill counter baseline (starts at 403 to maintain historical continuity)
-INSERT OR IGNORE INTO counters (name, value) VALUES ('autofill', 403);
+-- Initialize autofill counter baseline (starts at 0)
+INSERT OR IGNORE INTO counters (name, value) VALUES ('autofill', 0);
 
 -- 2. Anonymous event log for analytics
 CREATE TABLE IF NOT EXISTS events (
