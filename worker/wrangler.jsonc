@@ -8,7 +8,7 @@
         {
             "binding": "DB",
             "database_name": "nix-helper-db",
-            "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+            "database_id": "0289a97f-843e-4e8e-8c2d-9d1f00c69778"
         }
     ],
     "vars": {

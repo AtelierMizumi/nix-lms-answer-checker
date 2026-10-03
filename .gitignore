@@ -17,3 +17,10 @@ npm-debug.log*
 
 # Lock files (optional - uncomment if you want to ignore)
 # package-lock.json
+
+# Agents & Skills
+.agents/
+skills-lock.json
+
+# Cloudflare Wrangler
+.wrangler/

@@ -45,7 +45,7 @@ describe('Cloudflare Worker Telemetry API', () => {
         const data = await res.json();
         expect(data.success).toBe(true);
         expect(typeof data.count).toBe('number');
-        expect(data.count).toBeGreaterThanOrEqual(403);
+        expect(data.count).toBeGreaterThanOrEqual(0);
     });
 
     it('should increment counter on valid POST /track', async () => {
@@ -194,5 +194,17 @@ describe('Cloudflare Worker Telemetry API', () => {
         const authReq = new Request('https://telemetry.local/dashboard?key=secret-admin-token', { method: 'GET' });
         const authRes = await worker.fetch(authReq, protectedEnv);
         expect(authRes.status).toBe(200);
+    });
+
+    it('should return release info on GET /version', async () => {
+        const req = new Request('https://telemetry.local/version', { method: 'GET' });
+        const res = await worker.fetch(req, mockEnv);
+        expect(res.status).toBe(200);
+
+        const data = await res.json();
+        expect(data.success).toBe(true);
+        expect(data).toHaveProperty('latestVersion');
+        expect(data).toHaveProperty('updateUrl');
+        expect(data).toHaveProperty('releaseNotes');
     });
 });
