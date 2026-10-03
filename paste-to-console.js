@@ -34,9 +34,9 @@
         const CONFIG = {
             AUTO_FILL_DELAY: 0,
             AUTO_FILL_STORAGE_KEY: 'nix-helper-auto-fill',
-            USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-count',
+            USAGE_COUNT_STORAGE_KEY: 'nix-helper-usage-counter',
             USAGE_COUNT_START: 0,
-            SCRIPT_VERSION: '2.3.0',
+            SCRIPT_VERSION: '2.3.1',
             UPDATE_URL:
                 'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js',
             DISMISSED_UPDATE_STORAGE_KEY: 'nix-helper-dismissed-update',
@@ -126,6 +126,11 @@
 
             loadUsageCount() {
                 try {
+                    // Purge legacy mock count (>= 400) from earlier testing
+                    const legacy = window.localStorage.getItem('nix-helper-usage-count');
+                    if (legacy && Number.parseInt(legacy, 10) >= 400) {
+                        window.localStorage.removeItem('nix-helper-usage-count');
+                    }
                     const stored = Number.parseInt(window.localStorage.getItem(CONFIG.USAGE_COUNT_STORAGE_KEY), 10);
                     return Number.isFinite(stored) && stored >= CONFIG.USAGE_COUNT_START
                         ? stored
@@ -194,7 +199,7 @@
                     const data = await res.json();
                     if (data?.success) {
                         if (typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
-                            STATE.usageCount = Math.max(STATE.usageCount, data.count);
+                            STATE.usageCount = data.count;
                             Utils.saveUsageCount(STATE.usageCount);
                             UI.updateUsageCount();
                         }
@@ -233,7 +238,7 @@
                     .then(data => {
                         if (data?.success) {
                             if (typeof data.count === 'number' && data.count >= CONFIG.USAGE_COUNT_START) {
-                                STATE.usageCount = Math.max(STATE.usageCount, data.count);
+                                STATE.usageCount = data.count;
                                 Utils.saveUsageCount(STATE.usageCount);
                                 UI.updateUsageCount();
                             }
@@ -1182,7 +1187,7 @@
                             <span id="nix-toggle-knob" style="position:absolute;width:20px;height:20px;left:${STATE.autoFillEnabled ? '23px' : '3px'};top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(15,23,42,.25);transition:left .2s;"></span>
                         </label>
                     </div>
-                    <small id="nix-usage-count" title="Tổng lượt giải bài quiz được đồng bộ thời gian thực" style="color:#94a3b8;text-align:center;">Lượt sử dụng: ${STATE.usageCount}</small>
+                    <small id="nix-usage-count" title="Tổng lượt giải bài quiz được đồng bộ thời gian thực. Bấm để làm mới" style="color:#94a3b8;text-align:center;cursor:pointer;user-select:none;">Lượt sử dụng: ${STATE.usageCount}</small>
                 </div>
             `;
 
@@ -1202,6 +1207,14 @@
                     progress.style.display = isHidden ? 'block' : 'none';
                     if (updateBanner) updateBanner.style.display = isHidden ? 'flex' : 'none';
                 };
+
+                const usageBtn = div.querySelector('#nix-usage-count');
+                if (usageBtn) {
+                    usageBtn.onclick = () => {
+                        usageBtn.textContent = 'Đang đồng bộ...';
+                        Utils.syncGlobalUsageCount();
+                    };
+                }
 
                 if (STATE.updateInfo) {
                     this.showUpdateBanner(STATE.updateInfo);

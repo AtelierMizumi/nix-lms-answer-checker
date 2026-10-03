@@ -20,7 +20,7 @@ const MEMORY_STORE = {
 const RATE_LIMIT_WINDOW_MS = 10 * 1000; // 10 seconds per increment
 const MAX_REQUESTS_PER_WINDOW = 2; // Allow small burst (e.g. retry), then throttle
 const BASELINE_COUNT = 0; // Baseline counter offset
-const DEFAULT_LATEST_VERSION = '2.3.0';
+const DEFAULT_LATEST_VERSION = '2.3.1';
 const DEFAULT_UPDATE_URL =
     'https://raw.githubusercontent.com/AtelierMizumi/nix-lms-answer-checker/main/dist/nix-helper.user.js';
 

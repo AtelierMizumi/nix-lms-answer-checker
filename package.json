@@ -1,6 +1,6 @@
 {
     "name": "nix-lms-answer-checker",
-    "version": "2.3.0",
+    "version": "2.3.1",
     "description": "Automatically extracts and displays answers from NIX Digital LMS quizzes",
     "main": "paste-to-console.js",
     "type": "module",
